@@ -329,7 +329,7 @@ const createApp = () => {
   );
 
   execSync("babel --extensions .js,.jsx ./__build__ -d ./build/app");
-  execSync("yarn build");
+  execSync("yarn build:babel");
 
   try {
     execSync("rm -rf ./__build__");
