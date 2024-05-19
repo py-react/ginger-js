@@ -4,10 +4,10 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "webpack": "webpack --stats-error-details",
-    "start": "node routes.js",
-    "build": "babel --extensions .js,.jsx ./src -d ./build",
-    "dev": "nodemon --ext jsx,tsx,js,json  --watch ./src --watch createApp.js --watch webpack.config.js --exec yarn webpack"
+    "build": "webpack --stats-error-details",
+    "test": "node routes.js",
+    "build:babel": "babel --extensions .js,.jsx ./src -d ./build",
+    "dev": "nodemon --ext jsx,tsx,js,json  --watch ./src --watch createApp.js --watch webpack.config.js --exec yarn build"
   },
   "dependencies": {
     "@babel/cli": "^7.24.5",
