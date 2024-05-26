@@ -38,11 +38,8 @@ module.exports = {
       filename :path.join("../", "css","global.css"),
     }),
   ],
+ 
   resolve: {
     extensions: [".js", ".jsx"], // Add other extensions as needed
-    alias: {
-      src: path.resolve(__dirname, "src"), // Alias for the components directory
-      components: path.resolve(__dirname, "src", "components"), // Alias for the components directory
-    },
   },
 };
