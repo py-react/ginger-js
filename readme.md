@@ -182,7 +182,7 @@ Path Example : src/app/products/[productId]/index.py
 
 from reactpy.SSR.ssr import ssr
 from flask import request
-
+import requests
 
 def index(productId):
     api_url = f'https://dummyjson.com/products/{productId}'  # Replace this with the URL of the API you want to fetch data from
@@ -190,11 +190,10 @@ def index(productId):
 
     if response.status_code == 200:
         data = response.json()
-        return ssr(request,{"location":{},"product":data})
-    return ssr(request,{"location":{}})
+        return ssr(request,{"product":data})
+    return ssr(request)
 
 ```
-For now, include ```"location": {}``` in the props. In the future, you will only pass the necessary props.
 
 #### Component Example
 ```jsx
