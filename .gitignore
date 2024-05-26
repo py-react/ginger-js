@@ -1,4 +1,7 @@
-/node_modules
-/env
+node_modules
+env
 __pycache__
 build
+dist
+gingerjs.egg-info
+.env
