@@ -2,6 +2,26 @@
 
 Unlike typical setups where Node.js serves as the backend for frontend applications, this project leverages Python to deliver a comprehensive full-stack solution.
 
+### Install GingerJS
+
+First, you need to install GingerJS using `pip`. Open your terminal or command prompt and run the following command:
+
+```bash
+pip install gingerjs
+```
+
+### Create your app
+
+```bash
+gingerjs create-app
+```
+
+### Create your app
+
+```bash
+gingerjs runserver
+```
+
 ## Main Features
 Some of the main py-react features include:
 
@@ -196,3 +216,15 @@ export default Products;
 Enjoy your full-stack development experience with Python and React!
 
 
+
+<!-- Write a better build process -->
+## Building this project locally
+
+```bash
+python setup.py sdist bdist_wheel
+```
+
+To install built package
+```bash
+pip install absolute/relative/path/to/dist/gingerjs-0.0.1-py3-none-any.whl
+```
