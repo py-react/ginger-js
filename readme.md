@@ -16,7 +16,7 @@ pip install gingerjs
 gingerjs create-app
 ```
 
-### Create your app
+### Run server
 
 ```bash
 gingerjs runserver
