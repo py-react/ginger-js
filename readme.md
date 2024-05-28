@@ -4,7 +4,23 @@ Unlike typical setups where Node.js serves as the backend for frontend applicati
 
 ### Install GingerJS
 
-First, you need to install GingerJS using `pip`. Open your terminal or command prompt and run the following command:
+#### Python Environment and Requirements
+Create a virtual environment to manage dependencies locally:
+```shell
+virtualenv env
+```
+Activate the virtual environment:
+```shell
+source env/bin/activate
+```
+Alternatively:
+
+```shell
+. env/bin/activate
+```
+
+
+Now, you need to install GingerJS using `pip`. Open your terminal or command prompt and run the following command:
 
 ```bash
 pip install gingerjs
@@ -22,6 +38,13 @@ gingerjs create-app
 gingerjs runserver
 ```
 
+
+The application will run on port 5001 by default. If port 5000 is already in use, you can change the port in main.py:
+If 5000 is already in use, You can change the default port by adding port in main.py 
+```python
+app.run(debug=True, host="0.0.0.0", port=<PORT>)
+```
+
 ## Main Features
 Some of the main py-react features include:
 
@@ -36,71 +59,7 @@ Although our docs are designed to be beginner-friendly, we need to establish a b
 
 To get the most out of our docs, it's recommended that you have a basic understanding of Flask,HTML, CSS, and React. If you need to brush up on your React skills, check out this [React Foundations Course](https://nextjs.org/learn/react-foundations) and [FLask](https://flask.palletsprojects.com/en/3.0.x/), which will introduce you to the fundamentals.
 
-## Getting Started
-Follow the below steps to get started
 
-### Setup
-
-#### Python Environment and Requirements
-Create a virtual environment to manage dependencies locally:
-```shell
-virtualenv env
-```
-Activate the virtual environment:
-```shell
-source env/bin/activate
-```
-Alternatively:
-
-```shell
-. env/bin/activate
-```
-Install the required Python packages:
-```shell
-pip install requirements.txt
-```
-
-#### Install Node Modules
-Using yarn
-```shell
-yarn
-```
-Using npm
-```shell
-npm i
-```
-
-All dependencies are now installed.
-
-### Build the Frontend
-Using yarn
-```shell
-yarn build
-```
-Using npm
-```shell
-npm run build
-```
-### Build the Frontend in Development Mode
-Using yarn
-```shell
-yarn dev
-```
-Using npm
-```shell
-npm run dev
-```
-This command uses nodemon to track changes and rebuild the app on file save.
-
-### Run application
-```shell
-python main.py
-```
-The application will run on port 5000 by default. If port 5000 is already in use, you can change the port in main.py:
-If 5000 is already in use, You can change the default port by adding port in main.py 
-```python
-app.run(debug=True, host="0.0.0.0", port=<PORT>)
-```
 ## Creating your First Page
 
 ### Layouts
@@ -179,8 +138,7 @@ The server logic is placed alongside `index.jsx` or `layout.jsx` within the same
 #### Server Example
 Path Example : src/app/products/[productId]/index.py
 ```python
-
-from reactpy.SSR.ssr import ssr
+from gingerjs.SSR.ssr import ssr
 from flask import request
 import requests
 
@@ -191,7 +149,7 @@ def index(productId):
     if response.status_code == 200:
         data = response.json()
         return ssr(request,{"product":data})
-    return ssr(request)
+    return ssr(request,{"product":{"error":{"message":"Something went wrong! Please try again"}}})
 
 ```
 
