@@ -1,4 +1,4 @@
-from flask import Flask, request
+from flask import Flask, request,g
 import os
 from flask_cors import CORS
 from gingerjs import add_url_rules
@@ -14,10 +14,8 @@ def before_request():
     if 'localhost' in request.host_url or '0.0.0.0' in request.host_url:
         app.jinja_env.cache = {}
 
-# Generate Flask routes based on frontend folder structure
-add_url_rules(os.path.join(os.getcwd(),"src","app"),app)
+# Generate Flask routes
+add_url_rules(os.path.join(os.getcwd(),"src","app"),app,debug=False)
 
-# app.add_url_rule("/counter",view_func=counter)
 if __name__ == '__main__':
-    
     app.run(debug=True,host="0.0.0.0",port=os.environ.get('ENV_PORT', 5001))

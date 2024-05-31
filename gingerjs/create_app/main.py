@@ -48,6 +48,7 @@ def create_app():
     shutil.copy(f"{os.path.dirname(os.path.abspath(__file__))}/app/webpack.config.js",base)
     shutil.copy(f"{os.path.dirname(os.path.abspath(__file__))}/app/tailwind.config.js",base)
     shutil.copy(f"{os.path.dirname(os.path.abspath(__file__))}/app/jsconfig.json",base)
+    shutil.copy(f"{os.path.dirname(os.path.abspath(__file__))}/app/components.json",base)
     shutil.copytree(src=f"{os.path.dirname(os.path.abspath(__file__))}/app/public/",dst=f"{base}/public/")
     shutil.copytree(src=f"{os.path.dirname(os.path.abspath(__file__))}/app/src/",dst=f"{base}/src/")
     create_dir(f"{os.path.dirname(os.path.abspath(__file__))}/app/src/components")
@@ -56,12 +57,12 @@ def create_app():
     click.echo("Installing packages")
     if(ISDEV):
       click.echo("Setting up app for dev")
-      subprocess.run(["yalc","add","react_py"], cwd=base)
+      subprocess.run(["yalc","add","gingerjs"], cwd=base)
     else:
-      subprocess.run(["yarn","add","react_py"], cwd=base)
+      subprocess.run(["yarn","add","gingerjs"], cwd=base)
     subprocess.run(["yarn"], cwd=base)
     click.echo("Packages installed")
-    click.echo("Run app by : gingerjs runserver")
+    click.echo("Run app your app using gingerjs cli : gingerjs runserver")
   except subprocess.CalledProcessError as e:
         click.echo(f"Error: {e}", err=True)
         
@@ -70,7 +71,7 @@ def create_app():
 def runserver():
     """Run the main.py."""
     try:
-        subprocess.run(["yarn", "webpack"], check=True, cwd=base)
+        subprocess.run(["yarn", "gingerJs" ,"build"], check=True, cwd=base)
         subprocess.run(["python","main.py"], check=True, cwd=base)
     except subprocess.CalledProcessError as e:
         click.echo(f"Error: {e}", err=True)

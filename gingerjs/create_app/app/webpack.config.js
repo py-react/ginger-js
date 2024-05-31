@@ -1,10 +1,10 @@
 const path = require("path");
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
-const createApp = require("react_py/createApp");
+const createApp = require("gingerjs/createApp");
 
 module.exports = {
   mode: "development",
-  entry: createApp(__dirname),
+  entry: createApp(__dirname,true),
   output: {
     path: path.resolve(__dirname, "public", "static", "js"),
     filename: "app.js",

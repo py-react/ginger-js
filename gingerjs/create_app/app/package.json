@@ -42,8 +42,10 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.23.0",
-    "react_py": "file:.yalc/react_py",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwind-merge": "^2.3.0",
+    "tailwindcss-animate": "^1.0.7",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1"
   },
   "devDependencies": {
     "@types/node": "^20.12.8",

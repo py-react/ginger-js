@@ -1,5 +1,3 @@
-from gingerjs.SSR.ssr import ssr
-from flask import request
-
-def index():
-    return ssr(request)
+def index(request):
+    isDev = "true"
+    return {"isdev":isDev}

@@ -1,9 +1,31 @@
-const { Writable } = require("stream");
+const { Writable,Transform } = require("stream");
 const path = require("path");
 const ext = "js";
 
 const React = require("react");
 const ReactDOMServer = require("react-dom/server");
+
+
+class LoggingTransformStream extends Transform {
+  constructor(options) {
+    super(options);
+  }
+
+  _transform(chunk, encoding, callback) {
+    // Check if chunk is undefined
+    if (typeof chunk === 'undefined') {
+      console.error("Received undefined chunk");
+      // Call the callback to signal that the chunk has been processed
+      return callback();
+    }
+
+    // Pass the chunk through to the next stream in the pipeline
+    this.push(chunk);
+    // Call the callback to signal that the chunk has been processed
+    callback();
+  }
+
+}
 
 // Custom writable stream that logs data to the console
 class LoggingWritableStream extends Writable {
@@ -27,34 +49,42 @@ class SSR {
   constructor(props) {
     this.props = JSON.parse(props);
   }
-  render() {
-    const App = require(path.resolve("./", "build", "app", "app.js"));
-    const StaticRouter = require(path.resolve(
-      "./",
-      "build",
-      "app",
-      "StaticRouterWrapper.js"
-    ));
-    const { location } = this.props;
-    const ReactElement = React.createElement(App.default, {
-      children: null,
-      location,
-      serverProps: this.props,
-    });
-    const StaticRouterWrapper = React.createElement(StaticRouter.default, {
-      children: ReactElement,
-      url: this.props.location.path,
-    });
-    const componentHTML =
-      ReactDOMServer.renderToPipeableStream(StaticRouterWrapper);
-
-    // Create an instance of the logging writable stream
-    const loggingWritableStream = new LoggingWritableStream();
-    componentHTML.pipe(loggingWritableStream);
-    // After the stream has ended, the concatenated string can be accessed
-    loggingWritableStream.on("finish", () => {
-      console.log(loggingWritableStream.renderString()); //
-    });
+  async render() {
+    return new Promise((resolve, reject) => {
+      try {
+        const App = require(path.resolve("./", "build", "app", "app.js"));
+        const StaticRouter = require(path.resolve(
+          "./",
+          "build",
+          "app",
+          "StaticRouterWrapper.js"
+        ));
+        const { location } = this.props;
+        const ReactElement = React.createElement(App.default, {
+          children: null,
+          location,
+          serverProps: this.props,
+        });
+        const StaticRouterWrapper = React.createElement(StaticRouter.default, {
+          children: ReactElement,
+          url: this.props.location.path,
+        });
+        const componentHTML =
+          ReactDOMServer.renderToPipeableStream(StaticRouterWrapper);
+        
+        // Create an instance of the logging writable stream
+        const loggingWritableStream = new LoggingWritableStream();
+        const loggingTransformStream = new LoggingTransformStream();
+        componentHTML.pipe(loggingTransformStream).pipe(loggingWritableStream);
+        // After the stream has ended, the concatenated string can be accessed
+        loggingWritableStream.on("finish", () => {
+          resolve(loggingWritableStream.renderString())
+        });
+      } catch (error) {
+        console.log(error,"error")
+        reject(error);
+      }
+    })
   }
 
   createElement(path, props) {
@@ -67,13 +97,5 @@ class SSR {
   }
 }
 
-(async () => {
-  try {
-    const props = process.argv[2] || JSON.stringify({location:{path: "/",baseUrl:"/",query:""}});
-    const ssr = new SSR(props);
-    ssr.render();
-  } catch (error) {
-    console.error("Error:", error);
-    process.exit(1);
-  }
-})();
+
+module.exports = SSR
