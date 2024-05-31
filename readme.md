@@ -155,8 +155,10 @@ def index(request,productId):
 Path Example : src/app/products/[productId]/middleware.py
 ```python
 def middleware(request,abort):
-    #  your logic
-    return abort(401,{"error":"No Auth"})
+    token = request.headers.get('X-Auth-Token')
+    if token != 'secret-token':
+      return abort(401,{"error":"No Auth"})
+    return
 
 ```
 
