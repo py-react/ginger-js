@@ -1,4 +1,3 @@
-// server.js
 const net = require("net");
 const path = require("path");
 const fs = require("fs");
@@ -12,14 +11,14 @@ if (fs.existsSync(socketPath)) {
   return
 }
 
-const debug_log = ()=>{
+const debug_log = (msg)=>{
   if(process.argv.length > 2){
     const args = process.argv.slice(2)
     for(let i = 0;i<args.length;i++){
       if(args[0].includes("debug=")){
         let value = args[i].slice(args[i].indexOf("=")+1)
         if(value==="True"){
-          return console.log
+          return console.log("Node Layer: ",msg)
         }
       }
     }
@@ -28,19 +27,29 @@ const debug_log = ()=>{
   return ()=>{}
 }
 
-const console_log = debug_log()
+const console_log = debug_log
 
 
 const server = net.createServer((connection) => {
   console_log("Client connected");
   connection.on("data", async(data) => {
-    const response = new SSR(data)
-    const rendered = await response.render();
-    const lengthBuffer = Buffer.alloc(4);
-    lengthBuffer.writeUInt32BE(rendered.length, 0);
-    connection.write(lengthBuffer);
-    connection.write(rendered);
+    const receivedData = JSON.parse(data)
+    if(receivedData.type === "health_check"){
+      const response = "200"
+      const lengthBuffer = Buffer.alloc(4);
+      lengthBuffer.writeUInt32BE(response.length, 0);
+      connection.write(lengthBuffer);
+      connection.write(response);
+    }else if(receivedData.type === "ssr"){
+      const response = new SSR(receivedData.data)
+      const rendered = await response.render();
+      const lengthBuffer = Buffer.alloc(4);
+      lengthBuffer.writeUInt32BE(rendered.length, 0);
+      connection.write(lengthBuffer);
+      connection.write(rendered);
+    }
   });
+
   connection.on("end", () => {
     console_log("Client disconnected");
     shutdown()

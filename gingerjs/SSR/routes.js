@@ -47,7 +47,7 @@ class LoggingWritableStream extends Writable {
 
 class SSR {
   constructor(props) {
-    this.props = JSON.parse(props);
+    this.props = props;
   }
   async render() {
     return new Promise((resolve, reject) => {

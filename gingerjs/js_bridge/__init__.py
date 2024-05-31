@@ -3,6 +3,7 @@ import socket
 import subprocess
 import struct
 import time
+import json
 
 
 
@@ -22,7 +23,7 @@ class JSBridge:
         if(self.debug):
             print("JSBridge logs: "+str(msg))
 
-    def initialize(self,**kwargs):
+    def initialize(self,*args,**kwargs):
         self.debug = kwargs.get("debug",False)
         dir_path = os.path.dirname(os.path.abspath(__file__))
         # Define the socket path
@@ -38,9 +39,10 @@ class JSBridge:
                 self.debug_log("Trying to Create a bridge between app and node")
                 if os.path.exists(os.path.join(dir_path, "unix_socket.sock")):
                     # Wait a bit to ensure the server has started
-                    # time.sleep(1)
+                    self.debug_log(f"Calling connect")
                     self.client.connect(socket_path)
-                    self.debug_log("Created bridge between app and node")
+                    data = self.send_and_receive(json.dumps({"type":"health_check","data":""}))
+                    self.debug_log("Connected", data)
                     break
                 time.sleep(1)
             
@@ -76,7 +78,7 @@ class JSBridge:
 
     def send_and_receive(self, message):
         try:
-            self.debug_log("Sending props to app")
+            self.debug_log("Sending data to node",{message})
             self.client.sendall(message.encode('utf-8'))
             # Receive the length of the message first (4 bytes, big-endian)
             length_data = self.client.recv(4)
