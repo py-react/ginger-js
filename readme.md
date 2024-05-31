@@ -178,6 +178,17 @@ function Products({serverProps:{product}}) {
 export default Products;
 
 ```
+#### Api Example
+Path Example : src/app/api/product/[id]index.py
+```python
+
+def index(request,id):
+    data = {}
+    for key,value in request.args.items():
+        data[key] = value
+    return {"query":data,"id":id}
+
+```
 
 Enjoy your full-stack development experience with Python and React!
 
