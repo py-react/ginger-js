@@ -152,8 +152,17 @@ def index(productId):
     return ssr(request,{"product":{"error":{"message":"Something went wrong! Please try again"}}})
 
 ```
+#### Middleware Example
+Path Example : src/app/products/[productId]/middleware.py
+```python
+def middleware(request,abort):
+    #  your logic
+    return abort(401,{"error":"No Auth"})
+
+```
 
 #### Component Example
+Path Example : src/app/products/[productId]/index.jsx
 ```jsx
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
