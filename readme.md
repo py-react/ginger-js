@@ -139,17 +139,16 @@ The server logic is placed alongside `index.jsx` or `layout.jsx` within the same
 Path Example : src/app/products/[productId]/index.py
 ```python
 from gingerjs.SSR.ssr import ssr
-from flask import request
 import requests
 
-def index(productId):
+def index(request,productId):
     api_url = f'https://dummyjson.com/products/{productId}'  # Replace this with the URL of the API you want to fetch data from
     response = requests.get(api_url)
 
     if response.status_code == 200:
         data = response.json()
-        return ssr(request,{"product":data})
-    return ssr(request,{"product":{"error":{"message":"Something went wrong! Please try again"}}})
+        return {"product":data}
+    return {"product":{"error":{"message":"Something went wrong! Please try again"}}}
 
 ```
 #### Middleware Example
