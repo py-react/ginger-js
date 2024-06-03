@@ -3,8 +3,8 @@ from setuptools import setup, find_packages
 packages = find_packages()
 
 setup(
-    name='gingerjs',  # Replace with your package name
-    version='0.0.1',  # Replace with your package version
+    name='ginger_js',  # Replace with your package name
+    version='0.0.2',  # Replace with your package version
     author='py-react',  # Replace with your name
     author_email='yksandeep08+reactpy@gmail.com',  # Replace with your email
     description='A Truly Full-Stack Development Experience with Python and React',  # Replace with a short description
