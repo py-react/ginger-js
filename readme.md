@@ -1,4 +1,8 @@
-# A Truly Full-Stack Development Experience with Python and React
+<h1 style="text-align:center">GingerJs</h1>
+<h2 style="text-align:center">
+  Full-Stack Development Experience with Python and React <br/>
+  ✨ 🚀 Because in the Enterprise Jungle, even Node.js is just a frontend for the real backend ✨ 🚀
+</h2>
 
 Unlike typical setups where Node.js serves as the backend for frontend applications, this project leverages Python to deliver a comprehensive full-stack solution.
 
@@ -39,10 +43,10 @@ gingerjs runserver
 ```
 
 
-The application will run on port 5001 by default. If port 5000 is already in use, you can change the port in main.py:
-If 5000 is already in use, You can change the default port by adding port in main.py 
+The application will run on port 5001 by default.
+If 5001 is already in use, You can change the default port by adding port in main.py 
 ```python
-app.run(debug=True, host="0.0.0.0", port=<PORT>)
+app.run_app(debug=True, host="0.0.0.0", port=<PORT>)
 ```
 
 ## Main Features
@@ -195,14 +199,10 @@ Enjoy your full-stack development experience with Python and React!
 
 
 
-<!-- Write a better build process -->
-## Building this project locally
+## Using this project locally
+
+Clone this repo and run
 
 ```bash
-python setup.py sdist bdist_wheel
-```
-
-To install built package
-```bash
-pip install absolute/relative/path/to/dist/gingerjs-0.0.1-py3-none-any.whl
+pip install absolute/relative/path/to/repo
 ```
