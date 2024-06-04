@@ -1,5 +1,5 @@
-<h1 style="text-align:center">GingerJs</h1>
-<h2 style="text-align:center">
+<h1 align="center">GingerJs</h1>
+<h2 align="center">
   Full-Stack Development Experience with Python and React <br/>
   ✨ 🚀 Because in the Enterprise Jungle, even Node.js is just a frontend for the real backend ✨ 🚀
 </h2>
