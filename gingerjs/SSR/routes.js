@@ -46,10 +46,10 @@ class LoggingWritableStream extends Writable {
 }
 
 class SSR {
-  constructor(props) {
-    this.props = props;
+  constructor(cwd) {
+    this.cwd = cwd
   }
-  async render() {
+  async render(props) {
     return new Promise((resolve, reject) => {
       try {
         const App = require(path.resolve("./", "build", "app", "app.js"));
@@ -59,15 +59,15 @@ class SSR {
           "app",
           "StaticRouterWrapper.js"
         ));
-        const { location } = this.props;
+        const { location } = props;
         const ReactElement = React.createElement(App.default, {
           children: null,
           location,
-          serverProps: this.props,
+          serverProps: props,
         });
         const StaticRouterWrapper = React.createElement(StaticRouter.default, {
           children: ReactElement,
-          url: this.props.location.path,
+          url: props.location.path,
         });
         const componentHTML =
           ReactDOMServer.renderToPipeableStream(StaticRouterWrapper);

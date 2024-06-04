@@ -2,7 +2,10 @@ import os
 import importlib.util
 from .api import api
 from .view import view
+from .exception_view import exception
+from .not_found import not_found
 from .middleware import add_middleware
+from werkzeug.exceptions import HTTPException
 
 
 
@@ -10,8 +13,11 @@ from .middleware import add_middleware
 def define_routes(app,root_folder,route_type,bridge,*args, **kwargs):
     def debug_log (*a, **kwa):
         if kwargs.get("debug", False):
-            print("App Route: " ,*a, **kwa)
+            print(f"{os.getpid()} App Route: " ,*a, **kwa)
     debug_log(f"############## Creating {route_type} ##############")
+    app.config['TRAP_HTTP_EXCEPTIONS']=True
+    app.errorhandler(404)(not_found(bridge))
+    app.errorhandler(Exception)(exception(bridge))
     for dirpath, _, filenames in os.walk(root_folder):
         if ("/api/" not in dirpath and route_type == "view") or (route_type == "api"):
             for filename in filenames:

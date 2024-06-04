@@ -1,21 +1,22 @@
 from flask import Flask, request,g
+from gingerjs.app import App
 import os
 from flask_cors import CORS
 from gingerjs import add_url_rules
 
-
-app = Flask(__name__, template_folder='public/templates',static_url_path='',static_folder='public/static/')
+app = App(__name__, template_folder='public/templates',static_url_path='',static_folder='public/static/')
 CORS(app,resources={r"/api/*": {"origins": "*"}})
 
 @app.before_request
 def before_request():
     # When you import jinja2 macros, they get cached which is annoying for local
     # development, so wipe the cache every request.
-    if 'localhost' in request.host_url or '0.0.0.0' in request.host_url:
+    if os.environ.get('DEBUG') == "True" or False:
         app.jinja_env.cache = {}
 
 # Generate Flask routes
-add_url_rules(os.path.join(os.getcwd(),"src","app"),app,debug=False)
+add_url_rules(os.path.join(os.getcwd(),"src","app"),app,debug=True if os.environ.get('DEBUG')=="True" else False)
 
 if __name__ == '__main__':
-    app.run(debug=True,host="0.0.0.0",port=os.environ.get('ENV_PORT', 5001))
+    debug_app = os.environ.get('DEBUG')
+    app.run_app(debug=debug_app,host=os.environ.get('HOST'),port=os.environ.get('PORT'))

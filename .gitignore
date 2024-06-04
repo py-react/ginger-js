@@ -3,5 +3,8 @@ env
 __pycache__
 build
 dist
-ginger_js.egg-info
+gingerjs.egg-info
 .env
+__build__
+ginger_js.egg-in
+ginger_js.egg-info

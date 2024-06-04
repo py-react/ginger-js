@@ -1,3 +1,4 @@
+import os
 from flask import request,render_template
 from gingerjs.SSR import ssr
 
@@ -18,5 +19,10 @@ def view(module,bridge):
         # props['location']['baseUrl'] = req.base_url
         props['location']['query'] = str(request.query_string,"utf-8")
         toRender = ssr(bridge,props)
+        if os.environ.get('DEBUG', "False") == "True":
+            if ("<template data-stck=" in toRender) or ("<template data-msg=" in toRender):
+                props["hasError"] = "true"
+                props["error"] = toRender
+                toRender = ssr(bridge,props)
         return render_template("index.html",react_context=toRender,react_props=props)
     return view_func

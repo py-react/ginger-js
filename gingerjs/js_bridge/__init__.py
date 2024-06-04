@@ -10,7 +10,6 @@ import json
     
 class JSBridge:
     _instance = None
-
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(JSBridge, cls).__new__(cls)
@@ -21,52 +20,54 @@ class JSBridge:
 
     def debug_log(self, *msg):
         if(self.debug):
-            print("JSBridge logs: "+str(msg))
+            print(f"{os.getpid()} JSBridge logs: "+str(msg))
 
     def initialize(self,*args,**kwargs):
         self.debug = kwargs.get("debug",False)
         dir_path = os.path.dirname(os.path.abspath(__file__))
         # Define the socket path
-        socket_path = os.path.join(dir_path, 'unix_socket.sock')
+        socket_path = os.path.join(os.getcwd(), f"unix.sock")
+        # socket_path = os.path.join(dir_path, f"unix_{os.getpid()if os.environ.get('DEBUG','False')=='False'else'dev'}.sock")
         # Start the Node.js server as a subprocess
         node_process_path = os.path.join(dir_path, "unix_sock.js")
-        self.node_process = subprocess.Popen(['node', node_process_path,f"debug={self.debug}"])
-        self.debug_log(self.node_process.pid)
+        self.node_process = subprocess.Popen(['node', node_process_path,f"debug={os.environ.get('DEBUG','False')}",f'cwd={os.getcwd()}',f"sock_path={socket_path}"])
+        self.debug_log(f"Booted worker with pid : {self.node_process.pid}")
         # Create a Unix socket
-        self.client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
+            # Wait a bit to ensure the server has started
+            time.sleep(1)
+            self.client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             while True:
-                self.debug_log("Trying to Create a bridge between app and node")
-                if os.path.exists(os.path.join(dir_path, "unix_socket.sock")):
-                    # Wait a bit to ensure the server has started
-                    self.debug_log(f"Calling connect")
-                    self.client.connect(socket_path)
-                    data = self.send_and_receive(json.dumps({"type":"health_check","data":""}))
-                    self.debug_log("Connected", data)
-                    break
+                # Wait a bit to ensure the client is connected
                 time.sleep(1)
-            
+                self.debug_log(f"Calling connect")
+                self.client.connect(socket_path)
+                data = self.send_and_receive(json.dumps({"type":"health_check","data":""}))
+                self.debug_log("Connected", data)
+                if(data=="200"):
+                    break
         except Exception as e:
             self.debug_log("Exception : Unable to create bridge between app and node ",str(e))
             self.client.close()
             self.client = None
-            self.debug_log("Trying to terminate the node process")
-            self.node_process.terminate()
-            try:
-                self.node_process.wait(timeout=5)  # Wait for the process to terminate
-                self.node_process = None
-                self.debug_log("Terminated")
-            except Exception as e:
-                self.debug_log("Exception: " ,e)
-                while True:
-                    self.debug_log("Trying to kill the node process")
-                    try:
-                        self.node_process.kill()  # Force kill if it doesn't terminate in time
-                        self.debug_log("Killed")
-                        self.node_process = None
-                        break
-                    except Exception as e: 
-                        self.debug_log("Exception: " ,e)
+            if self.node_process!= None:
+                self.debug_log("Trying to terminate the node process")
+                self.node_process.terminate()
+                try:
+                    self.node_process.wait(timeout=5)  # Wait for the process to terminate
+                    self.node_process = None
+                    self.debug_log("Terminated")
+                except Exception as e:
+                    self.debug_log("Exception: " ,e)
+                    while True:
+                        self.debug_log("Trying to kill the node process")
+                        try:
+                            self.node_process.kill()  # Force kill if it doesn't terminate in time
+                            self.debug_log("Killed")
+                            self.node_process = None
+                            break
+                        except Exception as e: 
+                            self.debug_log("Exception: " ,e)
 
         
 
@@ -103,7 +104,8 @@ class JSBridge:
                     break
                 received_data += data
                 self.debug_log(f"Chunk : {data}")
-            self.debug_log("Recived Data: " ,received_data.decode('utf-8'))
+            decoded_recived_data = received_data.decode("utf-8")
+            self.debug_log("Recived Data: " ,decoded_recived_data)
             return received_data.decode('utf-8')
 
         except Exception as e:

@@ -3,6 +3,56 @@ import click
 import os
 import subprocess
 import shutil
+import os
+import signal
+import sys
+import time
+
+class Logger():
+    def __init__(self, name):
+        self.name = name
+    
+    def debug(self, *args, **kwargs):
+        if os.environ.get("DEBUG") == "true" or False:
+            print(*args, **kwargs)
+    
+    def info(self, *args, **kwargs):
+        print(*args, **kwargs)
+    
+    def error(self, *args, **kwargs):
+        print(*args, **kwargs)
+
+
+processes = []
+
+dir_path = os.path.dirname(os.path.abspath(__file__))
+logger = Logger("create gingerjs")
+
+debug = os.environ.get("debug", "False") == "True" or False
+
+class Execution_time ():
+    def __init__ (self,start_time,name):
+        self.start_time = start_time
+        self.name = name
+
+    def end(self,end_time):
+        execution_time = end_time - self.start_time
+        print(f"{self.name} Done","Execution Time:", execution_time, "seconds")
+
+
+def signal_handler(sig, frame):
+    print("Ctrl+C captured, killing all processes...")
+    for p in processes:
+        try:
+            p.terminate()
+            print(f"Building on file change stopped")
+        except Exception as e:
+            print(f"Error terminating process {p.pid}: {e}")
+            sys.exit(1)
+    sys.exit(0)
+
+# Register the signal handler
+signal.signal(signal.SIGINT, signal_handler)
 
 # base = os.path.join(os.getcwd(),"example","app")
 base = os.path.join(os.getcwd())
@@ -41,7 +91,74 @@ def cli():
     pass
 
 @cli.command()
+def babel():
+    """Builds the app using src folder (should be run after gingerjs cra)"""
+    click.echo("Building babel app")
+    command = [
+        'yarn',
+        'babel',
+        '--extensions', '.js,.jsx',
+        './src',
+        '-d', './build'
+    ]
+
+    # Execute the command
+    result = subprocess.run(command, capture_output=True, text=True,cwd=base)
+    # Print the output
+    if len(result.stderr):
+        print("stderr:", result.stderr)
+    else:
+        print("stdout:", result.stdout)
+
+@cli.command()
+@click.argument('mode',required=False)
+def build(mode):
+    """Builds the app using webpack config"""
+    start_time = time.time()
+    if mode == "dev":
+        os.environ.setdefault("DEBUG","True")
+    timing = Execution_time(start_time,"Building app")
+    click.echo("Building app")
+    my_env = os.environ.copy()
+    create_create_app = subprocess.Popen(['python', f"{os.path.join(dir_path,'create_app.py')}"], env=my_env,stdout=subprocess.PIPE)
+    create_create_app_com = create_create_app.communicate()
+    logger.debug(create_create_app_com[0].decode("utf-8"))
+    if create_create_app_com[1]:
+        logger.error(create_create_app_com[1].decode("utf-8"))
+    end_time = time.time()
+    timing.end(end_time)
+
+
+
+@cli.command()
+@click.argument('mode',required=False)
+def dev_build(mode):
+    """Builds the app in watch mode"""
+    if mode == "dev":
+        os.environ.setdefault("DEBUG","True")
+    my_env = os.environ.copy()
+    click.echo("Building app in in watch mode")
+    command = [
+        'yarn','nodemon',
+        '--ext', 'jsx,tsx,js,json',
+        '--watch', './src',
+        '--watch', 'webpack.config.js',
+        '--exec', 'gingerjs build'
+    ]
+    subprocess.run(command,cwd=base,env=my_env)
+
+@cli.command()
+def cra():
+    """Creates a react app using src folder"""
+    my_env = os.environ.copy()
+    create_app_process = subprocess.Popen(['python', f"{os.path.join(dir_path,'create_app.py')}"],env=my_env)
+    processes.append(create_app_process)
+        
+
+
+@cli.command()
 def create_app():
+  """Intial project setup"""
   try:
     create_dir(base)
     click.echo("Setting up flask app")
@@ -67,14 +184,30 @@ def create_app():
     click.echo("Run your app using gingerjs cli : gingerjs runserver")
   except subprocess.CalledProcessError as e:
         click.echo(f"Error: {e}", err=True)
-        
 
 @cli.command()
-def runserver():
-    """Run the main.py."""
+@click.argument('mode',required=False)
+def runserver(mode):
+    """Runs the webapp"""
     try:
-        subprocess.run(["yarn", "gingerJs" ,"build"], check=True, cwd=base)
-        subprocess.run(["python","main.py"], check=True, cwd=base)
+        if mode=="dev":
+            my_env = os.environ.copy()  # Copy the current environment
+            my_env["DEBUG"] = "True"
+            my_env["PORT"] = "5001"
+            my_env["HOST"] = "0.0.0.0"
+            my_env["GINGERJS_APP_DIR"] = base
+
+            click.echo("Running in Dev Mode")
+            # subprocess.run(["gingerjs","build"], check=True,cwd=base,env=my_env)
+            subprocess.run(["python","main.py"], check=True, cwd=base, env=my_env)
+        else:
+            my_env = os.environ.copy()  # Copy the current environment
+            my_env["DEBUG"] = "False"
+            my_env["PORT"] = "5001"
+            my_env["HOST"] = "0.0.0.0"
+            my_env["GINGERJS_APP_DIR"] = base
+            subprocess.run(["gingerjs","build"], check=True,cwd=base,env=my_env)
+            subprocess.run(["python","main.py"], check=True, cwd=base,env=my_env)
     except subprocess.CalledProcessError as e:
         click.echo(f"Error: {e}", err=True)
 

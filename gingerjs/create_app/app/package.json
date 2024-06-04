@@ -4,9 +4,8 @@
   "main": "index.js",
   "license": "MIT",
   "scripts": {
-    "webpack":"gingerjs webpack",
-    "build": "gingerjs build",
-    "dev": "gingerjs dev",
+    "dev": "gingerjs runserver dev",
+    "start": "gingerjs runserver",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "babel": {
@@ -39,13 +38,13 @@
     "@radix-ui/react-accordion": "^1.1.2",
     "@radix-ui/react-icons": "^1.3.0",
     "babel-loader": "^9.1.3",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.23.0",
     "tailwind-merge": "^2.3.0",
-    "tailwindcss-animate": "^1.0.7",
-    "class-variance-authority": "^0.7.0",
-    "clsx": "^2.1.1"
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
     "@types/node": "^20.12.8",
@@ -58,7 +57,7 @@
     "eslint": "^8",
     "eslint-config-next": "14.2.3",
     "mini-css-extract-plugin": "^2.9.0",
-    "nodemon": "^3.1.0",
+    "nodemon": "^3.1.2",
     "postcss": "^8.4.38",
     "postcss-loader": "^8.1.1",
     "tailwindcss": "^3.4.3",
