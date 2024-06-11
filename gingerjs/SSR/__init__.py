@@ -1,1 +1,1 @@
-from .ssr import ssr
+from .ssr import ssr,partial_ssr

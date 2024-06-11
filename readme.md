@@ -142,7 +142,6 @@ The server logic is placed alongside `index.jsx` or `layout.jsx` within the same
 #### Server Example
 Path Example : src/app/products/[productId]/index.py
 ```python
-from gingerjs.SSR.ssr import ssr
 import requests
 
 def index(request,productId):
@@ -155,6 +154,39 @@ def index(request,productId):
     return {"product":{"error":{"message":"Something went wrong! Please try again"}}}
 
 ```
+#### layout server Example
+Path Example : src/app/layout.py (will be visible to all subroute)
+```python
+
+def layout(request):
+    return {"isDev":"true"}
+
+```
+
+#### layout client Example
+Path Example : src/app/layout.jsx (will be visible to all subroute)
+```jsx
+function Layout({serverData}) {
+  const [someState,setSomeState] = useState(serverData)
+
+  // useEffect will only be executed on client side
+  useEffect(()=>{
+    setSomeState(serverData)
+  },[serverData]) // this is required as to set the props again on the client side to avoid hydration error
+  
+  return (
+    <>
+      <div className="p-0 m-0">
+        <Header data={someState}/>
+        <Outlet />
+      </div>
+    </>
+  );
+}
+
+export default Layout;
+```
+
 #### Middleware Example
 Path Example : src/app/products/[productId]/middleware.py
 ```python
@@ -172,7 +204,7 @@ Path Example : src/app/products/[productId]/index.jsx
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
-function Products({serverProps:{product}}) {
+function Products({product}) {
   return (
     <>
       {JSON.stringify(product)}

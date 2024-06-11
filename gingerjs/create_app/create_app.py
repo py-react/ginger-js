@@ -48,66 +48,69 @@ def generate_component_name(component_path):
     )
 
 def replace_wildcards(path):
+    if path == "/":
+        return "*"
     # Define the regex pattern to match any text within square brackets
     pattern = re.compile(r"\[([^\]]+)\]")
     # Replace the matching segments with : followed by the captured text
     return pattern.sub(r":\1", path)
 
-def create_routes(data, parent_path="/", layout=DEFAULT_LAYOUT, debug=False):
+def create_routes(data, parent_path="/", debug=False):
     routes = []
     parent = parent_path
-    layout_comp = layout
-    page_not_found = PAGE_NOT_FOUND
-    print({"data":data},"findMe")
+    layout_comp = DEFAULT_LAYOUT
+    page_not_found = None
     # TODO :get 404 page and other
     if "layout.jsx" in data:
         layout_comp = generate_component_name(data["layout.jsx"])
-    else:
+    elif "layout.jsx" not in data and parent_path == "/":
         layout_comp = DEFAULT_LAYOUT
 
     if "not_found.jsx" in data:
         page_not_found = generate_component_name(data["not_found.jsx"])
 
     if "index.jsx" in data:
-        routes.append(f'<Route path="{replace_wildcards(parent)}" element={{<{layout_comp}/>}} >')
+        
+        routes.append(f"""
+                <Route path="{replace_wildcards(parent)}" 
+                    element = {{
+                        <LayoutPropsProvider Element = {{{layout_comp}}}  {{...props}}/>
+                    }}
+                    
+                >
+        """)
         for key in data:
             route_path = data["index.jsx"].split("app")[1].replace("/index.jsx", "")
             if key not in {"index.jsx", "layout.jsx", "app.jsx", "loading.jsx","not_found.jsx"}:
-                routes.extend(create_routes(data[key], key, layout_comp, debug))
+                routes.extend(create_routes(data[key], key, debug))
             elif key not in {"layout.jsx", "app.jsx", "loading.jsx","not_found.jsx"}:
                 component_name = generate_component_name(data["index.jsx"])
                 add_path = f'path="{replace_wildcards(route_path).replace(f"/{parent}", "")}"'
                 sub_paths = route_path.split("/")
-                with open(data["index.jsx"], "r") as file:
-                    file_data = file.read()
-                if "use client" in file_data:
-                    routes.append(f'''
-                            <Route 
-                                {
-                                    "index" if sub_paths[-1] == parent_path or route_path in {"", "/src/"} else add_path
-                                }  
-                                element={{
-                                    <LazyComp 
-                                        LazyComponent={component_name} 
-                                        Loader={{typeof {component_name.replace("Index", "Loading")}==='function'?{component_name.replace("Index", "Loading")}:<div style={{height:"100vh"}} className="flex  w-full justify-center items-center"><h3>loading...</h3></div>}} 
-                                        {{...props}}
-                                    />
-                                }}
-                            />
-                        ''')
-                else:
-                    routes.append(f'''
-                        <Route {"index" if sub_paths[-1] == parent_path or route_path in ["", "/src/"] else add_path}
-                            element={{
-                                    <React.Suspense fallback={{typeof {component_name.replace("Index","Loading")} === "function"?<{component_name.replace("Index","Loading")}/>: <div style={{{{ height: "100vh" }}}} className="flex w-full justify-center items-center"><h3>loading...</h3></div>}}>
-                                        <{component_name} {{...props}} />
-                                    </React.Suspense>
-                            }}
-                        />
-                    ''')
-
-        routes.append(f'<Route path="*" element={{<{page_not_found} />}}/>')
+                
+                routes.append(f'''
+                    <Route {"index" if sub_paths[-1] == parent_path or route_path in ["", "/src/"] else add_path}
+                        element={{
+                                <React.Suspense 
+                                    fallback={{
+                                        typeof {component_name.replace("Index","Loading")} === "function"
+                                            ?<{component_name.replace("Index","Loading")} id={{props.location.path}}/>
+                                            : (<div id={{props.location.path}} style={{{{ height: "100vh" }}}} 
+                                                className="flex w-full justify-center items-center">
+                                                    <h3>loading...</h3>
+                                                </div>)
+                                    }}>
+                                    <PropsProvider Element={{{component_name}}} {{...props}} />
+                                </React.Suspense>
+                                
+                        }}
+                    />
+                ''')
         routes.append('</Route>')
+        if page_not_found is not None:
+            routes.append(f'<Route path="*" element={{<{page_not_found} />}}/>')
+        if page_not_found is None and parent == "/":
+            routes.append(f'<Route path="*" element={{<{PAGE_NOT_FOUND} />}}/>') 
     return routes
 
 def generic_not_found():
@@ -120,11 +123,11 @@ def generic_not_found():
                 height:"100vh",
             }} className="flex items-center justify-center bg-white dark:bg-gray-950 px-4 md:px-6">
                 <div className="max-w-md text-center space-y-4">
-                    <h1 style={{
-                            fontSize: "8rem",
-                            lineHeight: "1",
-                            color: "rgb(17 24 39)"
-                        }} className="font-bold text-gray-900 dark:text-gray-50">404</h1>
+                    <h1 style={{fontSize: "8rem", lineHeight: "1", color: "rgb(17 24 39)"}} 
+                        className="font-bold text-gray-900 dark:text-gray-50"
+                    >
+                        404
+                    </h1>
                     <p style={{fontSize: "1.125rem",color: "rgb(107 114 128)"}} className="dark:text-gray-400">
                         Oops, the page you are looking for could not be found.
                     </p>
@@ -141,7 +144,7 @@ def generate_error_component():
     return '''
     import React from 'react';
 
-    const ErrorMessage = ({ serverProps:{hasError,error},...props }) => {
+    const ErrorMessage = ({hasError,error,...props }) => {
         const parseErrorMessage = (data) => {
             const msgStartIndex = data.indexOf('data-msg="') + 'data-msg="'.length;
             const msgEndIndex = data.indexOf('"', msgStartIndex);
@@ -182,16 +185,14 @@ def generate_lazy_component(debug=False):
         useEffect(() => {{
             setShouldRenderLazy(true);
         }}, []);
-        const LazyIndex = shouldRenderLazy ? <LazyComponent {{...props}} /> : <div style={{{{height:"100vh"}}}} className="flex w-full justify-center items-center"><h3>loading...</h3></div>;
+        const LazyIndex = shouldRenderLazy ? LazyComponent : Loader
 
         return (
             <>
                 {{shouldRenderLazy && (
-                    <React.Suspense fallback={{<Loader />}}>
-                        <{error_component}> 
-                            <LazyIndex />
-                        </{error_component_closing}> 
-                    </React.Suspense>
+                    <{error_component}> 
+                        {{LazyIndex}}
+                    </{error_component_closing}> 
                 )}}
             </>
         );
@@ -203,12 +204,10 @@ def generate_debug_error_component():
     class ErrorBoundary extends React.Component {
         constructor(props) {
             super(props);
-            console.log('ErrorBoundary')
             this.state = { hasError: false};
         }
 
         static getDerivedStateFromError(error) {
-            console.log({ error },'findMe')
             return { hasError: true };
         }
 
@@ -244,16 +243,15 @@ def generate_import_statements(obj):
             component_name = generate_component_name(node)
             if "/app.jsx" not in node:
                 file_data = open(node, "r").read()
-                if "use client" in file_data:
-                    imports.append(f'const {component_name} = React.lazy(() => import("{node.replace("/src/", "/build/").replace(".jsx", ".js")}"));')
-                else:
-                    imports.append(f'import {component_name} from "{node.replace("/src/", "/build/").replace(".jsx", ".js")}";')
+                # if "use client" in file_data:
+                # imports.append(f'const {component_name} = React.lazy(() => import("{node.replace("/src/", "/build/").replace(".jsx", ".js")}"));')
+                # else:
+                imports.append(f'import {component_name} from "{node.replace("/src/", "/build/").replace(".jsx", ".js")}";')
         else:
             for key in node:
                 traverse(node[key], f'{path}/{key}')
 
     traverse(obj, "")
-    print({"imports":imports})
     return "\n".join(imports)
 
 def create_react_app_with_routes(paths, debug):
@@ -273,15 +271,48 @@ def create_react_app_with_routes(paths, debug):
     node_data = create_nodes(paths)
     to_return = [
         f"""
-        import React, {{ useState, useEffect }} from 'react';
+        import React, {{ useState, useEffect,useRef }} from 'react';
         {'import Error from "./Error"' if debug else ""}
         import GenericNotFound from "./GenericNotFound"   
-        import {{ BrowserRouter as Router, Route, Routes, Outlet }} from 'react-router-dom';     
-        import {{ Redirect }} from 'react-router'
-        function DefaultLayout_() {{
-            return <Outlet />
-        }}
+        import {{ BrowserRouter as Router, Route, Routes, Outlet, useLocation }} from 'react-router-dom';     
+        import {{ Redirect }} from 'react-router';
+        const DefaultLayout_ = React.memo(()=>{{
+            return <Outlet/>
+        }})
+        const PropsProvider = React.memo(({{Element,...props}})=>{{
+            const [propsData,setPropData] = useState({{...props}})
+            useEffect(()=>{{
+                const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
+                setPropData(data)
+            }},[])
+            return <Element {{...propsData}} />
+        }})
+        const LayoutPropsProvider = React.memo(({{Element,...props}})=>{{
+            const location = useLocation();
+            const [propsData,setPropsData] = useState((()=>{{
+                if ("layout_props" in props){{
+                    Object.keys(props.layout_props).map(key=>{{
+                        if (location.pathname.includes(key)){{
+                             return {{...props.layout_props[key],location:props.location}}
+                        }}
+                    }})
+                }}else{{
+                    return {{...props}}
+                }}
+            }})())
+            useEffect(()=>{{
+                const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
+                if ("layout_props" in data){{
+                    Object.keys(data.layout_props).map(key=>{{
+                        if (location.pathname.includes(key)){{
+                            setPropsData({{...data.layout_props[key],location:props.location}})
+                        }}
+                    }})
 
+                }}
+            }},[location])
+            return <Element {{...propsData}} />
+        }})
         {generate_import_statements(node_data)}
 
         {generate_lazy_component(debug)}
@@ -311,9 +342,10 @@ def create_react_app_with_routes(paths, debug):
 
 def generate_main_client_entry():
     return '''
-    import React from 'react';
+    import React,{useState,useEffect} from 'react';
     import Router from "./BrowserRouterWrapper"
-    import { hydrateRoot } from 'react-dom/client';
+    import ReactDOM from 'react-dom';
+    import { hydrateRoot,createRoot } from 'react-dom/client';
     import App from "./app"
     function getServerProps(props) {{
         try {
@@ -341,9 +373,9 @@ def generate_main_client_entry():
                     return toReturn;
                 }
                 const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
-                delete window.flask_react_app_props
-                document.getElementById("serverScript")?.remove();
-                return { serverProps: data, ...props };
+                // delete window.flask_react_app_props
+                // document.getElementById("serverScript")?.remove();
+                return { ...data,...props };
             }
         } catch (error) {
             // pass
@@ -355,9 +387,15 @@ def generate_main_client_entry():
         // Run your specific function here
         // e.g., log to a service, display a fallback UI, etc.
     }
-
     const container = document.getElementById("root");
-    hydrateRoot(container, <Router><App {...getServerProps({})}/></Router>,{onRecoverableError:handleHydrationError});
+
+    const timeOfRender = new Date()
+  
+    window.__REACT_HYDRATE__ = function(url){
+        hydrateRoot(container,<React.StrictMode><Router><App {...getServerProps({})}/></Router></React.StrictMode>,{onRecoverableError:handleHydrationError});
+    }
+    window.__REACT_HYDRATE__()
+    
     '''
 
 def generate_browser_router_wrapper():
@@ -427,28 +465,16 @@ def create_app():
     with open(os.path.join(cwd, "__build__", "GenericNotFound.jsx"), "w") as file:
         file.write(generic_not_found())
 
-    build_cra = subprocess.Popen(["yarn", "babel", "--extensions", ".js,.jsx", "./__build__", "-d", "./build/app"], cwd=base,stdout=subprocess.PIPE)
-    build_cra_com = build_cra.communicate()
-    logger.debug(build_cra_com[0].decode("utf-8"))
-    if build_cra_com[1]:
-        logger.error(build_cra_com[1].decode("utf-8"))
+    subprocess.run(["yarn", "babel", "--extensions", ".js,.jsx", "./__build__", "-d", "./build/app"], cwd=base,check=True)
     if not debug:
-        subprocess.run(["rm", "-rf", "./__build__"], check=True,cwd=cwd)
+        subprocess.run(["rm", "-rf", "./__build__"], check=True, cwd=cwd)
     babel_command = [
         'gingerjs',
         'babel',
     ]
-    babe_build = subprocess.Popen(babel_command, cwd=base, env=my_env,stdout=subprocess.PIPE)
-    babe_build_com = babe_build.communicate()
-    logger.debug(babe_build_com[0].decode("utf-8"))
-    if babe_build_com[1]:
-        logger.error(babe_build_com[1].decode("utf-8"))
+    subprocess.run(babel_command, cwd=base, env=my_env)
 
-    webpack_build = subprocess.Popen(["yarn", "webpack", "--stats-error-details"], cwd=base, env=my_env,stdout=subprocess.PIPE)
-    webpack_build_com = webpack_build.communicate()
-    logger.debug(webpack_build_com[0].decode("utf-8"))
-    if webpack_build_com[1]:
-        logger.error(webpack_build_com[1].decode("utf-8"))
+    subprocess.run(["yarn", "webpack", "--stats-error-details"], cwd=base, check=True, env=my_env)
     
     
 

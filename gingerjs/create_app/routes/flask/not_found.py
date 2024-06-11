@@ -1,5 +1,5 @@
 import os
-from flask import render_template,render_template_string,request
+from flask import render_template,request
 from gingerjs.SSR import ssr
 
 not_found_template = """

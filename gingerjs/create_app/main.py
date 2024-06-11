@@ -120,11 +120,7 @@ def build(mode):
     timing = Execution_time(start_time,"Building app")
     click.echo("Building app")
     my_env = os.environ.copy()
-    create_create_app = subprocess.Popen(['python', f"{os.path.join(dir_path,'create_app.py')}"], env=my_env,stdout=subprocess.PIPE)
-    create_create_app_com = create_create_app.communicate()
-    logger.debug(create_create_app_com[0].decode("utf-8"))
-    if create_create_app_com[1]:
-        logger.error(create_create_app_com[1].decode("utf-8"))
+    subprocess.run(['python', f"{os.path.join(dir_path,'create_app.py')}"], check=True,env=my_env)
     end_time = time.time()
     timing.end(end_time)
 

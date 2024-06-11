@@ -63,7 +63,7 @@ class SSR {
         const ReactElement = React.createElement(App.default, {
           children: null,
           location,
-          serverProps: props,
+          ...props,
         });
         const StaticRouterWrapper = React.createElement(StaticRouter.default, {
           children: ReactElement,
@@ -84,6 +84,40 @@ class SSR {
         console.log(error,"error")
         reject(error);
       }
+    })
+  }
+
+  async partialRender(props){
+    return new Promise((resolve, reject) => {
+      // const Component = require(path.resolve("./", "build", "app", "app.js"));
+      const Component = require(path.resolve(this.cwd,"build","app",...props.location.path.split("/"),"index.js"));
+      const StaticRouter = require(path.resolve(
+        "./",
+        "build",
+        "app",
+        "StaticRouterWrapper.js"
+      ));
+      const { location } = props;
+      const ReactElement = React.createElement(Component.default, {
+        children: null,
+        location,
+        ...props,
+      });
+      const StaticRouterWrapper = React.createElement(StaticRouter.default, {
+        children: ReactElement,
+        url: props.location.path,
+      });
+      const componentHTML =
+          ReactDOMServer.renderToPipeableStream(ReactElement);
+      
+      // Create an instance of the logging writable stream
+      const loggingWritableStream = new LoggingWritableStream();
+      const loggingTransformStream = new LoggingTransformStream();
+      componentHTML.pipe(loggingTransformStream).pipe(loggingWritableStream);
+      // After the stream has ended, the concatenated string can be accessed
+      loggingWritableStream.on("finish", () => {
+        resolve(loggingWritableStream.renderString())
+      });
     })
   }
 

@@ -10,10 +10,10 @@
     {% autoescape false %}
     {% block content %}{% endblock %}
     {% if not error %}
-        <script id="serverScript">
-          window.flask_react_app_props = {{react_props | tojson}} // ignore the error, Jinja Template thing
-        </script>
-        <script src="/js/app.js"></script>
+      <script class="serverScript">
+          window.flask_react_app_props = {{react_props | tojson}};
+      </script>
+      <script id="appScript" src="/js/app.js"></script>
     {% endif %}
     {% endautoescape %}
   </body>

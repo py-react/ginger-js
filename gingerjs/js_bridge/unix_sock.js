@@ -60,6 +60,12 @@ try {
         lengthBuffer.writeUInt32BE(rendered.length, 0);
         connection.write(lengthBuffer);
         connection.write(rendered);
+      }else if (receivedData.type === "partial_ssr"){
+        const rendered = await ssr.partialRender(receivedData.data);
+        const lengthBuffer = Buffer.alloc(4);
+        lengthBuffer.writeUInt32BE(rendered.length, 0);
+        connection.write(lengthBuffer);
+        connection.write(rendered);
       }
     });
 
