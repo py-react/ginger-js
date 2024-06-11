@@ -26,9 +26,16 @@ Alternatively:
 
 Now, you need to install GingerJS using `pip`. Open your terminal or command prompt and run the following command:
 
+
+```shell
+pip install git+https://github.com/ginger-society/ginger-js.git
+```
+Alternatively:
+
 ```bash
 pip install gingerjs
 ```
+
 
 ### Create your app
 
