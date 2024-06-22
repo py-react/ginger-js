@@ -365,6 +365,20 @@ def create_react_app_with_routes(paths, debug):
                 }}
             }})())
 
+            useEffect(()=>{{
+                const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
+                if ("layout_props" in data){{
+                    Object.keys(data.layout_props).map(key=>{{
+                        if (location.pathname.includes(key) && matchPath({{ path: location.pathname, exact: true }},forUrl)){{
+                            React.startTransition(()=>{{
+                                setPropsData({{...data.layout_props[key],location:props.location}})
+                            }})
+                        }}
+                    }})
+
+                }}
+            }},[location])
+
             const Elem = React.useMemo(()=>{{
                 return <Element {{...propsData}} />
             }},[propsData])
