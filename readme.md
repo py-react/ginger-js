@@ -74,7 +74,7 @@ To get the most out of our docs, it's recommended that you have a basic understa
 ## Creating your First Page
 
 ### Layouts
-A layout is UI that is shared between multiple routes. On navigation, layouts preserve state, remain interactive, and do not re-render. Layouts can also be nested.
+A layout is UI that is shared between multiple routes. On navigation, layouts preserve state, remain interactive. Layouts can also be nested.
 
 You can define a layout by default exporting a React component from a layout.jsx file. The component will be populated with a child layout (if it exists) or a page during rendering.
 ```jsx
@@ -82,7 +82,7 @@ import React from "react";
 import Header from "../components/header";
 import { Outlet } from "react-router-dom";
 
-const Layout = ({ children }) => {
+const Layout = (props) => {
   return (
     <div className="p-4">
       <Header />
@@ -104,11 +104,10 @@ The two layouts would be nested as such:
 ![NextJs Multi layout example image](https://nextjs.org/_next/image?url=%2Fdocs%2Flight%2Fnested-layouts-ui.png&w=3840&q=75)
 
 ## Linking and Navigating
-There are Three ways to navigate between routes in py-react:
+There are currently two ways to navigate between routes in gingerJs:
 
-- Using the Link Component
-- Using the useRouter hook
-- Using the native History API
+- Using the Link Component (currently exported from libs)
+- Using the useNavigate hook (currently exported from libs)
 
 This page will go through how to use each of these options, and dive deeper into how navigation works.
 
@@ -136,6 +135,22 @@ function Product() {
 export default Product;
 
 ```
+Alternatively:
+```jsx
+import React, { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+
+function Product({productId}) {
+  return (
+    <>
+      {productId}
+    </>
+  );
+}
+
+export default Product;
+
+```
 
 ## Server-Side Props
 
@@ -153,6 +168,9 @@ import requests
 
 def index(request,productId):
     api_url = f'https://dummyjson.com/products/{productId}'  # Replace this with the URL of the API you want to fetch data from
+    # ----or---
+    # productId = request.args.get("productId")
+    # api_url = f'https://dummyjson.com/products/{productId}
     response = requests.get(api_url)
 
     if response.status_code == 200:
@@ -174,17 +192,10 @@ def layout(request):
 Path Example : src/app/layout.jsx (will be visible to all subroute)
 ```jsx
 function Layout({serverData}) {
-  const [someState,setSomeState] = useState(serverData)
-
-  // useEffect will only be executed on client side
-  useEffect(()=>{
-    setSomeState(serverData)
-  },[serverData]) // this is required as to set the props again on the client side to avoid hydration error
-  
   return (
     <>
       <div className="p-0 m-0">
-        <Header data={someState}/>
+        <Header data={serverData}/>
         <Outlet />
       </div>
     </>
@@ -236,6 +247,25 @@ def index(request,id):
 
 Enjoy your full-stack development experience with Python and React!
 
+#### Using Theme
+Inside your root layout.jsx
+
+```jsx
+import React from "react";
+import { Outlet } from "react-router-dom";
+import { ThemeProvider } from "src/libs/theme-provider"
+
+function Layout(props) {
+  return (
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+        <div className="p-0 m-0 dark:bg-gray-800 dark:text-white">
+          {/* Layout component */}
+          <Outlet />
+        </div>
+    </ThemeProvider>
+  )
+}
+```
 
 
 ## Using this project locally

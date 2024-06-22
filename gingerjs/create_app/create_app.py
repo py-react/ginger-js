@@ -55,11 +55,13 @@ def replace_wildcards(path):
     # Replace the matching segments with : followed by the captured text
     return pattern.sub(r":\1", path)
 
-def create_routes(data, parent_path="/", debug=False):
+def create_routes(data, parent_path="/",last_path="", debug=False):
     routes = []
     parent = parent_path
+    full_parent_path = last_path + "/" + replace_wildcards(parent).replace('*','') if replace_wildcards(parent) != "*" else last_path  + replace_wildcards(parent).replace('*','')
     layout_comp = DEFAULT_LAYOUT
     page_not_found = None
+
     # TODO :get 404 page and other
     if "layout.jsx" in data:
         layout_comp = generate_component_name(data["layout.jsx"])
@@ -74,7 +76,7 @@ def create_routes(data, parent_path="/", debug=False):
         routes.append(f"""
                 <Route path="{replace_wildcards(parent)}" 
                     element = {{
-                        <LayoutPropsProvider Element = {{{layout_comp}}}  {{...props}}/>
+                        <LayoutPropsProvider forUrl={{"{full_parent_path+"/"}"}} Element = {{{layout_comp}}}  {{...props}}/>
                     }}
                     
                 >
@@ -82,7 +84,7 @@ def create_routes(data, parent_path="/", debug=False):
         for key in data:
             route_path = data["index.jsx"].split("app")[1].replace("/index.jsx", "")
             if key not in {"index.jsx", "layout.jsx", "app.jsx", "loading.jsx","not_found.jsx"}:
-                routes.extend(create_routes(data[key], key, debug))
+                routes.extend(create_routes(data[key], key, full_parent_path, debug))
             elif key not in {"layout.jsx", "app.jsx", "loading.jsx","not_found.jsx"}:
                 component_name = generate_component_name(data["index.jsx"])
                 add_path = f'path="{replace_wildcards(route_path).replace(f"/{parent}", "")}"'
@@ -91,18 +93,7 @@ def create_routes(data, parent_path="/", debug=False):
                 routes.append(f'''
                     <Route {"index" if sub_paths[-1] == parent_path or route_path in ["", "/src/"] else add_path}
                         element={{
-                                <React.Suspense 
-                                    fallback={{
-                                        typeof {component_name.replace("Index","Loading")} === "function"
-                                            ?<{component_name.replace("Index","Loading")} id={{props.location.path}}/>
-                                            : (<div id={{props.location.path}} style={{{{ height: "100vh" }}}} 
-                                                className="flex w-full justify-center items-center">
-                                                    <h3>loading...</h3>
-                                                </div>)
-                                    }}>
-                                    <PropsProvider Element={{{component_name}}} {{...props}} />
-                                </React.Suspense>
-                                
+                            <PropsProvider Element={{{component_name}}} Fallback={{typeof {component_name.replace("Index","Loading")} === 'function'? {component_name.replace("Index","Loading")}: DefaultLoader_}} {{...props}} />
                         }}
                     />
                 ''')
@@ -244,9 +235,9 @@ def generate_import_statements(obj):
             if "/app.jsx" not in node:
                 file_data = open(node, "r").read()
                 # if "use client" in file_data:
-                # imports.append(f'const {component_name} = React.lazy(() => import("{node.replace("/src/", "/build/").replace(".jsx", ".js")}"));')
+                imports.append(f"""const {component_name} = React.lazy(() => import('{node.replace("/src/", "/build/").replace(".jsx", ".js")}'));""")
                 # else:
-                imports.append(f'import {component_name} from "{node.replace("/src/", "/build/").replace(".jsx", ".js")}";')
+                # imports.append(f'import {component_name} from "{node.replace("/src/", "/build/").replace(".jsx", ".js")}";')
         else:
             for key in node:
                 traverse(node[key], f'{path}/{key}')
@@ -275,45 +266,117 @@ def create_react_app_with_routes(paths, debug):
         {'import Error from "./Error"' if debug else ""}
         import GenericNotFound from "./GenericNotFound"   
         import {{ BrowserRouter as Router, Route, Routes, Outlet, useLocation }} from 'react-router-dom';     
-        import {{ Redirect }} from 'react-router';
+        import {{ Redirect, matchPath }} from 'react-router';
+
+        {generate_import_statements(node_data)}
+        
+
         const DefaultLayout_ = React.memo(()=>{{
             return <Outlet/>
         }})
-        const PropsProvider = React.memo(({{Element,...props}})=>{{
+
+        const DefaultLoader_ = React.memo(()=>{{
+            return <div
+                style={{{{
+                    height: "100vh",
+                    display: 'flex',
+                    width: '100%',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: '1rem',
+                }}}}
+              >
+                <div style={{{{
+                    backgroundColor: 'gray',
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '0.375rem',
+                    animation: 'bounce 1s ease-in-out 0s infinite'
+                }}}} />
+                <div style={{{{
+                    backgroundColor: 'gray',
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '0.375rem',
+                    animation: 'bounce 1s ease-in-out 0.2s infinite'
+                }}}} />
+                <div style={{{{
+                    backgroundColor: 'gray',
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '0.375rem',
+                    animation: 'bounce 1s ease-in-out 0.4s infinite'
+                }}}} />
+              </div>
+        }})
+
+        const PropsProvider = React.memo(({{Element,Fallback,...props}})=>{{
             const [propsData,setPropData] = useState({{...props}})
+            const [loading,setLoading] = useState(true)
+
             useEffect(()=>{{
                 const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
                 setPropData(data)
+                setLoading(false)
+                window.__enableScroll__()
             }},[])
-            return <Element {{...propsData}} />
+            
+            return (
+                <React.Suspense fallback={{<Fallback id={{props.location.path}}/>}}>
+                    <Element {{...propsData}} />
+                    <div className="p-4 absolute top-0 left-0 w-screen h-screen" 
+                        style={{{{
+                            display:(loading && Fallback) ? "inital":"none",
+                            zIndex:99999999999,
+                            background:"rgb(255 255 255 / 0.5)"
+                        }}}}
+                    >
+                        <Fallback id={{props.location.path}}/>
+                    </div>
+                </React.Suspense >
+            )
         }})
-        const LayoutPropsProvider = React.memo(({{Element,...props}})=>{{
+
+        const LayoutPropsProvider = React.memo(({{Element,Fallback , forUrl, ...props}})=>{{
             const location = useLocation();
+            
             const [propsData,setPropsData] = useState((()=>{{
-                if ("layout_props" in props){{
-                    Object.keys(props.layout_props).map(key=>{{
-                        if (location.pathname.includes(key)){{
-                             return {{...props.layout_props[key],location:props.location}}
+                if ("layout_props" in props) {{
+                    const layouts = Object.keys(props.layout_props).filter((key) => {{
+                        if (location.pathname.includes(key)) {{
+                            return {{ ...props.layout_props[key], location: props.location }};
                         }}
-                    }})
-                }}else{{
-                    return {{...props}}
+                    }});
+                    let currentLayoutProp = undefined
+                    for(let i=0;i<layouts.length;i++){{
+                        if(matchPath({{ path: layouts[i], exact: true }},forUrl)){{
+                            currentLayoutProp = props.layout_props[layouts[i]]
+                            break
+                        }}
+                    }}
+                    if(currentLayoutProp){{
+                        return currentLayoutProp
+                    }}else{{
+                        return props;
+                    }}
+                    // return props;
+                }} else {{
+                    return props;
                 }}
             }})())
-            useEffect(()=>{{
-                const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
-                if ("layout_props" in data){{
-                    Object.keys(data.layout_props).map(key=>{{
-                        if (location.pathname.includes(key)){{
-                            setPropsData({{...data.layout_props[key],location:props.location}})
-                        }}
-                    }})
 
-                }}
-            }},[location])
-            return <Element {{...propsData}} />
+            const Elem = React.useMemo(()=>{{
+                return <Element {{...propsData}} />
+            }},[propsData])
+            
+            return (
+                <React.Suspense fallback={{<></>}}>
+                    <>
+                        {{Elem}}
+                    </>
+                </React.Suspense>
+            )
         }})
-        {generate_import_statements(node_data)}
 
         {generate_lazy_component(debug)}
 
@@ -387,15 +450,29 @@ def generate_main_client_entry():
         // Run your specific function here
         // e.g., log to a service, display a fallback UI, etc.
     }
+    window.__disableScroll__ = function(){
+        window.overStyle = document.body.style.overflow
+        window.positionStyle = document.body.style.position
+        document.body.style.overflow = 'hidden';
+        document.body.style.position = 'fixed';
+    
+    };
+
+    window.__enableScroll__ = function(){
+        document.body.style.overflow = window.overStyle;
+        document.body.style.position = window.positionStyle;
+    };
+   
+
     const container = document.getElementById("root");
 
     const timeOfRender = new Date()
   
     window.__REACT_HYDRATE__ = function(url){
+        window.__disableScroll__()
         hydrateRoot(container,<React.StrictMode><Router><App {...getServerProps({})}/></Router></React.StrictMode>,{onRecoverableError:handleHydrationError});
     }
     window.__REACT_HYDRATE__()
-    
     '''
 
 def generate_browser_router_wrapper():
@@ -473,8 +550,17 @@ def create_app():
         'babel',
     ]
     subprocess.run(babel_command, cwd=base, env=my_env)
-
     subprocess.run(["yarn", "webpack", "--stats-error-details"], cwd=base, check=True, env=my_env)
+    copy_index = [
+        "cp",
+        "./public/templates/index.html",
+        "./build/templates/index.html"
+    ]
+    subprocess.run(copy_index, cwd=base, check=True)
+
+    for root,_,files in os.walk(f'{cwd}/build'):
+        if '__init__.py' not in files:
+            open(f'{root}/__init__.py', 'w+')
     
     
 

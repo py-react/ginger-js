@@ -19,7 +19,7 @@ const useNavigate = () => {
         var xhr = new XMLHttpRequest();
         xhr.onreadystatechange = function () {
           if (xhr.readyState === 4 && xhr.status === 200) {
-            callback(xhr.responseText);
+            callback(xhr.responseText,xhr.responseURL);
           }
         };
         xhr.open("GET", url, true);
@@ -35,7 +35,7 @@ const useNavigate = () => {
       }
 
       // Function to replace HTML with response
-      function replaceHTMLWithResponse(response) {
+      function replaceHTMLWithResponse(response,responseUrl) {
         let parser = new DOMParser();
         let doc = parser.parseFromString(response, "text/html");
         let scriptElement = doc.querySelector(".serverScript");
@@ -56,9 +56,9 @@ const useNavigate = () => {
         }
        
         if (replace) {
-          window.history.replaceState(null, "", path);
+          window.history.replaceState(null, "", responseUrl);
         } else {
-          window.history.pushState(null, "", path);
+          window.history.pushState(null, "", responseUrl);
         }
         // Dispatch a popstate event to notify the app of the navigation
         window.dispatchEvent(new PopStateEvent("popstate"));
@@ -77,8 +77,6 @@ const useNavigate = () => {
     } catch (error) {
       console.error("Error loading content:", error);
     }
-
-    
   }, []);
 
   return navigate;
