@@ -33,7 +33,7 @@ pip install git+https://github.com/ginger-society/ginger-js.git
 Alternatively:
 
 ```bash
-pip install gingerjs
+pip install ginger-js
 ```
 
 
