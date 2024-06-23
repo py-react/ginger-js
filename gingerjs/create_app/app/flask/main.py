@@ -4,7 +4,7 @@ import os
 from flask_cors import CORS
 from gingerjs import add_url_rules
 
-app = App(__name__, template_folder='build/templates',static_url_path='/static',static_folder='public/static/')
+app = App(__name__, template_folder='build/templates',static_url_path='/static',static_folder='build/static/')
 CORS(app,resources={r"/api/*": {"origins": "*"}})
 
 @app.before_request

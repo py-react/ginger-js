@@ -55,9 +55,10 @@ def replace_wildcards(path):
     # Replace the matching segments with : followed by the captured text
     return pattern.sub(r":\1", path)
 
-def create_routes(data, parent_path="/",last_path="", debug=False):
+def create_routes(data, parent_path="/",last_path="",parentLoader="", debug=False):
     routes = []
     parent = parent_path
+    loader = 'DefaultLoader_' if  parentLoader=="" else parentLoader
     full_parent_path = last_path + "/" + replace_wildcards(parent).replace('*','') if replace_wildcards(parent) != "*" else last_path  + replace_wildcards(parent).replace('*','')
     layout_comp = DEFAULT_LAYOUT
     page_not_found = None
@@ -71,8 +72,10 @@ def create_routes(data, parent_path="/",last_path="", debug=False):
     if "not_found.jsx" in data:
         page_not_found = generate_component_name(data["not_found.jsx"])
 
+    if "loading.jsx" in data:
+        loader = generate_component_name(data["loading.jsx"])
+
     if "index.jsx" in data:
-        
         routes.append(f"""
                 <Route path="{replace_wildcards(parent)}" 
                     element = {{
@@ -84,16 +87,17 @@ def create_routes(data, parent_path="/",last_path="", debug=False):
         for key in data:
             route_path = data["index.jsx"].split("app")[1].replace("/index.jsx", "")
             if key not in {"index.jsx", "layout.jsx", "app.jsx", "loading.jsx","not_found.jsx"}:
-                routes.extend(create_routes(data[key], key, full_parent_path, debug))
+                routes.extend(create_routes(data[key], key, full_parent_path,loader, debug))
             elif key not in {"layout.jsx", "app.jsx", "loading.jsx","not_found.jsx"}:
                 component_name = generate_component_name(data["index.jsx"])
                 add_path = f'path="{replace_wildcards(route_path).replace(f"/{parent}", "")}"'
                 sub_paths = route_path.split("/")
-                
                 routes.append(f'''
                     <Route {"index" if sub_paths[-1] == parent_path or route_path in ["", "/src/"] else add_path}
                         element={{
-                            <PropsProvider Element={{{component_name}}} Fallback={{typeof {component_name.replace("Index","Loading")} === 'function'? {component_name.replace("Index","Loading")}: DefaultLoader_}} {{...props}} />
+                            <>
+                                <PropsProvider Element={{{component_name}}} Fallback={{{loader}}} {{...props}} />
+                            </>
                         }}
                     />
                 ''')
@@ -238,6 +242,7 @@ def generate_import_statements(obj):
                 imports.append(f"""const {component_name} = React.lazy(() => import('{node.replace("/src/", "/build/").replace(".jsx", ".js")}'));""")
                 # else:
                 # imports.append(f'import {component_name} from "{node.replace("/src/", "/build/").replace(".jsx", ".js")}";')
+
         else:
             for key in node:
                 traverse(node[key], f'{path}/{key}')
@@ -322,7 +327,7 @@ def create_react_app_with_routes(paths, debug):
             }},[])
             
             return (
-                <React.Suspense fallback={{<Fallback id={{props.location.path}}/>}}>
+                <React.Suspense fallback={{<Fallback />}}>
                     <Element {{...propsData}} />
                     <div style={{{{
                             padding:"1rem",
@@ -336,7 +341,7 @@ def create_react_app_with_routes(paths, debug):
                             background:"rgb(255 255 255 / 0.5)"
                         }}}}
                     >
-                        <Fallback id={{props.location.path}}/>
+                        <Fallback />
                     </div>
                 </React.Suspense >
             )
@@ -570,6 +575,9 @@ def create_app():
     ]
     subprocess.run(babel_command, cwd=base, env=my_env)
     subprocess.run(["yarn", "webpack", "--stats-error-details"], cwd=base, check=True, env=my_env)
+    
+
+
     copy_index = [
         "cp",
         "./public/templates/index.html",
@@ -577,9 +585,18 @@ def create_app():
     ]
     subprocess.run(copy_index, cwd=base, check=True)
 
+    copy_static = [
+        "cp",
+        "-R",
+        f"{base}/public/static/",
+        f"{base}/build/static/"
+    ]
+    subprocess.run(copy_static, cwd=base, check=True)
+
     for root,_,files in os.walk(f'{cwd}/build'):
         if '__init__.py' not in files:
             open(f'{root}/__init__.py', 'w+')
+
     
     
 

@@ -20,7 +20,7 @@ const entry_output = {
   mode: "development",
   entry: entry,
   output: {
-    path: path.resolve(__dirname, "public", "static"),
+    path: path.resolve(__dirname, "build", "static"),
     filename: 
       MODE === "development"
       ? path.join("./","js","[name].buundle.js")
