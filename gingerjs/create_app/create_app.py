@@ -324,9 +324,14 @@ def create_react_app_with_routes(paths, debug):
             return (
                 <React.Suspense fallback={{<Fallback id={{props.location.path}}/>}}>
                     <Element {{...propsData}} />
-                    <div className="p-4 absolute top-0 left-0 w-screen h-screen" 
-                        style={{{{
-                            display:(loading && Fallback) ? "inital":"none",
+                    <div style={{{{
+                            padding:"1rem",
+                            position: "absolute",
+                            top:0,
+                            left:0,
+                            width:"100vw",
+                            height:"100vh",
+                            display:(loading && Fallback) ? "initial":"none",
                             zIndex:99999999999,
                             background:"rgb(255 255 255 / 0.5)"
                         }}}}
