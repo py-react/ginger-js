@@ -19,6 +19,7 @@ class Logger():
 logger = Logger("create-react-app")
 DEFAULT_LAYOUT = "DefaultLayout_"
 PAGE_NOT_FOUND = "GenericNotFound"
+DEFAULT_LOADER = "DefaultLoader_"
 dir_path = os.path.dirname(os.path.abspath(__file__))
 base = os.path.join(os.getcwd())
 
@@ -58,10 +59,10 @@ def replace_wildcards(path):
 def create_routes(data, parent_path="/",last_path="",parentLoader="", debug=False):
     routes = []
     parent = parent_path
-    loader = 'DefaultLoader_' if  parentLoader=="" else parentLoader
+    loader = DEFAULT_LOADER if  parentLoader=="" else parentLoader
     full_parent_path = last_path + "/" + replace_wildcards(parent).replace('*','') if replace_wildcards(parent) != "*" else last_path  + replace_wildcards(parent).replace('*','')
     layout_comp = DEFAULT_LAYOUT
-    page_not_found = None
+    page_not_found = PAGE_NOT_FOUND
 
     # TODO :get 404 page and other
     if "layout.jsx" in data:
@@ -69,8 +70,8 @@ def create_routes(data, parent_path="/",last_path="",parentLoader="", debug=Fals
     elif "layout.jsx" not in data and parent_path == "/":
         layout_comp = DEFAULT_LAYOUT
 
-    if "not_found.jsx" in data:
-        page_not_found = generate_component_name(data["not_found.jsx"])
+    if "page_not_found.jsx" in data:
+        page_not_found = generate_component_name(data["page_not_found.jsx"])
 
     if "loading.jsx" in data:
         loader = generate_component_name(data["loading.jsx"])
@@ -86,9 +87,9 @@ def create_routes(data, parent_path="/",last_path="",parentLoader="", debug=Fals
         """)
         for key in data:
             route_path = data["index.jsx"].split("app")[1].replace("/index.jsx", "")
-            if key not in {"index.jsx", "layout.jsx", "app.jsx", "loading.jsx","not_found.jsx"}:
+            if key not in {"index.jsx", "layout.jsx", "app.jsx", "loading.jsx","page_not_found.jsx"}:
                 routes.extend(create_routes(data[key], key, full_parent_path,loader, debug))
-            elif key not in {"layout.jsx", "app.jsx", "loading.jsx","not_found.jsx"}:
+            elif key not in {"layout.jsx", "app.jsx", "loading.jsx","page_not_found.jsx"}:
                 component_name = generate_component_name(data["index.jsx"])
                 add_path = f'path="{replace_wildcards(route_path).replace(f"/{parent}", "")}"'
                 sub_paths = route_path.split("/")
@@ -315,15 +316,26 @@ def create_react_app_with_routes(paths, debug):
               </div>
         }})
 
-        const PropsProvider = React.memo(({{Element,Fallback,...props}})=>{{
-            const [propsData,setPropData] = useState({{...props}})
+        const PropsProvider = ({{Element,Fallback,...props}})=>{{
+            const [propsData,setPropData] = useState((()=>{{
+                try {{
+                    const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
+                    return data
+                }}catch(err){{
+                    return props
+                }}
+            }})())
             const [loading,setLoading] = useState(true)
 
             useEffect(()=>{{
-                const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
-                setPropData(data)
-                setLoading(false)
-                window.__enableScroll__()
+                setLoading(true)
+                window.__disableScroll__()
+                React.startTransition(() => {{
+                    // const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
+                    // setPropData(data)
+                    setLoading(false)
+                    window.__enableScroll__()
+                }});
             }},[])
             
             return (
@@ -345,9 +357,9 @@ def create_react_app_with_routes(paths, debug):
                     </div>
                 </React.Suspense >
             )
-        }})
+        }}
 
-        const LayoutPropsProvider = React.memo(({{Element,Fallback , forUrl, ...props}})=>{{
+        const LayoutPropsProvider = ({{Element,Fallback , forUrl, ...props}})=>{{
             const location = useLocation();
             
             const [propsData,setPropsData] = useState((()=>{{
@@ -400,7 +412,7 @@ def create_react_app_with_routes(paths, debug):
                     </>
                 </React.Suspense>
             )
-        }})
+        }}
 
         {generate_lazy_component(debug)}
 
@@ -497,6 +509,29 @@ def generate_main_client_entry():
         hydrateRoot(container,<React.StrictMode><Router><App {...getServerProps({})}/></Router></React.StrictMode>,{onRecoverableError:handleHydrationError});
     }
     window.__REACT_HYDRATE__()
+
+    // Function to handle navigation events
+    function handleNavigation(event) {
+        if(event.state !== null){
+            window.flask_react_app_props = event.state
+        }
+        // Run your custom function here based on the navigation state
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Define your initial state object
+        const initialState = window.flask_react_app_props;
+
+        // Replace or push state as needed
+        history.replaceState(initialState, document.title, window.location.href);
+
+        // Optionally, dispatch a popstate event to notify the app of the initial state
+        window.dispatchEvent(new PopStateEvent('popstate', { state: initialState }));
+        
+        // Add event listener for 'popstate' events
+        window.addEventListener('popstate', handleNavigation);
+    });
+
     '''
 
 def generate_browser_router_wrapper():

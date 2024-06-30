@@ -18,9 +18,9 @@ function getArgValue(key, defaultValue = null) {
 const debug = getArgValue("debug", "False")==="True"?true:false;
 const debug_log = (msg) => {
   if (debug) {
-    return console.log(`${process.pid} Node Bridge: `, msg);
+    return console.log(`${process.pid} Node Bridge: ${msg}`);
   }
-  return () => {};
+  return ;
 };
 
 debug_log("Running in debug mode, This setting is Not Recomeneded for production use")
@@ -44,39 +44,76 @@ try {
 
 
   const server = net.createServer((connection) => {
-    console_log("Client connected");
+    debug_log("Client connected");
+
+    let buffer = Buffer.alloc(0);
+    let expectedLength = null;
+
     connection.on("data", async (data) => {
-      console_log(`Recived Data: ${data}` )
-      const receivedData = JSON.parse(data);
-      if (receivedData.type === "health_check") {
-        const response = "200";
-        const lengthBuffer = Buffer.alloc(4);
-        lengthBuffer.writeUInt32BE(response.length, 0);
-        connection.write(lengthBuffer);
-        connection.write(response);
-      } else if (receivedData.type === "ssr") {
-        const rendered = await ssr.render(receivedData.data);
-        const lengthBuffer = Buffer.alloc(4);
-        lengthBuffer.writeUInt32BE(rendered.length, 0);
-        connection.write(lengthBuffer);
-        connection.write(rendered);
-      }else if (receivedData.type === "partial_ssr"){
-        const rendered = await ssr.partialRender(receivedData.data);
-        const lengthBuffer = Buffer.alloc(4);
-        lengthBuffer.writeUInt32BE(rendered.length, 0);
-        connection.write(lengthBuffer);
-        connection.write(rendered);
-      }
+        buffer = Buffer.concat([buffer, data]);
+
+        while (true) {
+            if (expectedLength === null) {
+                if (buffer.length >= 4) {
+                    expectedLength = buffer.readUInt32BE(0);
+                    buffer = buffer.slice(4);
+                } else {
+                    break;
+                }
+            }
+
+            if (expectedLength !== null && buffer.length >= expectedLength) {
+                const message = buffer.slice(0, expectedLength).toString();
+                debug_log(`Received Data: ${message}`);
+
+                // Parse received data as JSON
+                let receivedData;
+                try {
+                    receivedData = JSON.parse(message);
+                } catch (err) {
+                    console.error(`Error parsing JSON: ${err}`);
+                    break;
+                }
+
+                // Handle different types of data
+                if (receivedData.type === "health_check") {
+                    const response = "200";
+                    const lengthBuffer = Buffer.alloc(4);
+                    lengthBuffer.writeUInt32BE(response.length, 0);
+                    connection.write(lengthBuffer);
+                    connection.write(response);
+                } else if (receivedData.type === "ssr" || receivedData.type === "partial_ssr") {
+                    let rendered;
+                    if (receivedData.type === "ssr") {
+                        rendered = await ssr.render(receivedData.data);
+                    } else {
+                        rendered = await ssr.partialRender(receivedData.data);
+                    }
+                    const lengthBuffer = Buffer.alloc(4);
+                    lengthBuffer.writeUInt32BE(rendered.length, 0);
+                    connection.write(lengthBuffer);
+                    connection.write(rendered);
+                }
+
+                // Reset for next message
+                buffer = buffer.slice(expectedLength);
+                expectedLength = null;
+            } else {
+                break;
+            }
+        }
     });
 
     connection.on("end", () => {
-      console_log("Client disconnected");
-      // shutdown();
+        debug_log("Client disconnected");
+        // Perform cleanup if needed
     });
+
     connection.on("error", (err) => {
-      console.error(`Error: ${err.message}`);
+        console.error(`Error: ${err.message}`);
     });
-  });
+});
+
 
   server.listen(socketPath, async () => {
     console_log(`Node Bride listening on ${socketPath}`);

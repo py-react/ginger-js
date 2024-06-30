@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 
 const useNavigate = () => {
-
+  
   const navigate = useCallback((path, { replace = false } = {}) => {
     if (!path) {
       console.error("Navigation path is required");
@@ -54,14 +54,30 @@ const useNavigate = () => {
           // Append the script to the current document to execute it
           document.body.appendChild(newScript);
         }
-       
+        // Get the title
+        let title = doc.querySelector('title').textContent;
+        // Get all <meta> elements from the parsed HTML string
+        let newMetaElements = doc.head.querySelectorAll('meta');
+
+        // Get the current document's <head> element
+        let currentHead = document.head;
+
+        // Remove all existing <meta> elements from the current document
+        let currentTitle = document.querySelector('title');
+        let currentMetaElements = currentHead.querySelectorAll('meta');
+        currentMetaElements.forEach(meta => meta.remove());
+        currentTitle.remove()
+        // Append the new <meta> elements to the current document's <head>
+        currentHead.appendChild(doc.querySelector('title').cloneNode(true))
+        newMetaElements.forEach(meta => currentHead.appendChild(meta.cloneNode(true)));
+        
         if (replace) {
-          window.history.replaceState(null, "", responseUrl);
+          window.history.replaceState(window.flask_react_app_props, title, responseUrl);
         } else {
-          window.history.pushState(null, "", responseUrl);
+          window.history.pushState(window.flask_react_app_props, title, responseUrl);
         }
         // Dispatch a popstate event to notify the app of the navigation
-        window.dispatchEvent(new PopStateEvent("popstate"));
+        window.dispatchEvent(new PopStateEvent('popstate',{ state: window.flask_react_app_props }));
         window.scroll({
           top: 0, 
           left: 0, 

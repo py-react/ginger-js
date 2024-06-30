@@ -27,6 +27,9 @@ def not_found(bridge):
         props['location']["path"] = request.path
         props['location']['query'] = str(request.query_string,"utf-8")
         toRender = ssr(bridge,props)
-        return render_template("index.html",react_context=toRender,react_props=props),404
+        meta = {
+            "title": request.path+"?"+str(request.query_string,"utf-8")
+        }
+        return render_template("index.html",react_context=toRender,react_props=props,meta_info=meta),404
         # return render_template_string(not_found_template,error=True),404
     return view_func

@@ -38,5 +38,10 @@ def view(module,bridge):
                 props["hasError"] = "true"
                 props["error"] = toRender
                 toRender = ssr(bridge,props)
-        return render_template("index.html",react_context=toRender,react_props=props)
+        meta = {
+            "title": "GingerJs"
+        }
+        if hasattr(module, 'meta_data'):
+            meta = module.meta_data()
+        return render_template("index.html",react_context=toRender,react_props=props,meta_info=meta)
     return view_func

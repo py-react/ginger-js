@@ -1,3 +1,4 @@
+import io
 import os
 import socket
 import subprocess
@@ -76,11 +77,29 @@ class JSBridge:
         if self.client is None:
             raise Exception("Client not initialized. Call initialize() first.")
         return self.client
+    
+    def send_all(self, data):
+        """Ensure all data is sent."""
+        length = len(data)
+        length_prefix = struct.pack('!I', length)  # Pack length as 4-byte unsigned int
+        message = length_prefix + data
+
+        total_sent = 0
+        chunk_size = min(len(message),1024)  # Adjust this as needed, depending on your application
+        while total_sent < len(message):
+            chunk = message[total_sent:total_sent + chunk_size]
+            self.debug_log("Sending data to node", chunk)
+            sent = self.client.send(chunk)
+            self.debug_log({"sent": sent})
+            if sent == 0:
+                raise RuntimeError("Socket connection broken")
+            total_sent += sent
+        self.debug_log("Total sent:",total_sent,"Expected to send:",len(message))
 
     def send_and_receive(self, message):
         try:
-            self.debug_log("Sending data to node",{message})
-            self.client.sendall(message.encode('utf-8'))
+            
+            self.send_all(message.encode("utf-8"))
             # Receive the length of the message first (4 bytes, big-endian)
             length_data = self.client.recv(4)
             if len(length_data) < 4:
