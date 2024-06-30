@@ -267,6 +267,18 @@ function Layout(props) {
 }
 ```
 
+Add Meta Data 
+```python
+# add the below in your index.py file
+def meta_data():
+    return {
+        "title": "Ginger-Js",
+        "description": "Some Description",
+        "og:description": "Description Here",
+        "icon":"/static/images/favicon.ico"
+    }
+```
+
 
 ## Using this project locally
 
