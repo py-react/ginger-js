@@ -80,7 +80,7 @@ def create_routes(data, parent_path="/",last_path="",parentLoader="", debug=Fals
         routes.append(f"""
                 <Route path="{replace_wildcards(parent)}" 
                     element = {{
-                        <LayoutPropsProvider forUrl={{"{full_parent_path+"/"}"}} Element = {{{layout_comp}}}  {{...props}}/>
+                        <LayoutPropsProvider forUrl={{"{full_parent_path+"/"}"}} Element={{{layout_comp}}} {{...props}}/>
                     }}
                     
                 >
@@ -317,6 +317,9 @@ def create_react_app_with_routes(paths, debug):
         }})
 
         const PropsProvider = ({{Element,Fallback,...props}})=>{{
+            const location = useLocation()
+            const [loading,setLoading] = useState(true)
+
             const [propsData,setPropData] = useState((()=>{{
                 try {{
                     const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
@@ -325,43 +328,46 @@ def create_react_app_with_routes(paths, debug):
                     return props
                 }}
             }})())
-            const [loading,setLoading] = useState(true)
 
             useEffect(()=>{{
                 setLoading(true)
                 window.__disableScroll__()
                 React.startTransition(() => {{
-                    // const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
-                    // setPropData(data)
+                    const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
+                    setPropData(data)
                     setLoading(false)
                     window.__enableScroll__()
                 }});
-            }},[])
+                return ()=>{{
+                    setLoading(false)
+                }}
+            }},[location])
             
             return (
                 <React.Suspense fallback={{<Fallback />}}>
                     <Element {{...propsData}} />
                     <div style={{{{
-                            padding:"1rem",
                             position: "absolute",
                             top:0,
                             left:0,
-                            width:"100vw",
-                            height:"100vh",
-                            display:(loading && Fallback) ? "initial":"none",
+                            padding:"1rem",
+                            minWidth:"100vw",
+                            minHeight:"100vh",
                             zIndex:99999999999,
-                            background:"rgb(255 255 255 / 0.5)"
+                            background:"rgb(255 255 255 / 0.5)",
+                            display:(loading && Fallback) ? "flex":"none",
+                            justifyContent:"center",
+                            alignItems:"center"
                         }}}}
-                    >
-                        <Fallback />
-                    </div>
+                        >
+                            <Fallback />
+                        </div>
                 </React.Suspense >
             )
         }}
 
         const LayoutPropsProvider = ({{Element,Fallback , forUrl, ...props}})=>{{
             const location = useLocation();
-            
             const [propsData,setPropsData] = useState((()=>{{
                 if ("layout_props" in props) {{
                     const layouts = Object.keys(props.layout_props).filter((key) => {{
@@ -399,6 +405,7 @@ def create_react_app_with_routes(paths, debug):
                     }})
 
                 }}
+                
             }},[location])
 
             const Elem = React.useMemo(()=>{{
@@ -449,31 +456,7 @@ def generate_main_client_entry():
     function getServerProps(props) {{
         try {
             if (window !== undefined) {
-                function getElementAttributeByPrefix(documentId, prefix) {
-                    const element = document.getElementById(documentId);
-                    if (!element) {
-                        return null;
-                    }
-                    const toReturn = {}
-
-                    for (const attribute of element.attributes) {
-                        const attributeName = attribute.name;
-
-                        if (attributeName.startsWith(prefix)) {
-                            try {
-                                toReturn[attributeName.replace(prefix, "")] = JSON.parse(attribute.value)
-                            } catch {
-                                toReturn[attributeName.replace(prefix, "")] = attribute.value
-                            }
-                            return attribute.value;
-                        }
-                    }
-
-                    return toReturn;
-                }
                 const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
-                // delete window.flask_react_app_props
-                // document.getElementById("serverScript")?.remove();
                 return { ...data,...props };
             }
         } catch (error) {
@@ -486,26 +469,12 @@ def generate_main_client_entry():
         // Run your specific function here
         // e.g., log to a service, display a fallback UI, etc.
     }
-    window.__disableScroll__ = function(){
-        window.overStyle = document.body.style.overflow
-        window.positionStyle = document.body.style.position
-        document.body.style.overflow = 'hidden';
-        document.body.style.position = 'fixed';
     
-    };
-
-    window.__enableScroll__ = function(){
-        document.body.style.overflow = window.overStyle;
-        document.body.style.position = window.positionStyle;
-    };
-   
-
     const container = document.getElementById("root");
 
     const timeOfRender = new Date()
   
     window.__REACT_HYDRATE__ = function(url){
-        window.__disableScroll__()
         hydrateRoot(container,<React.StrictMode><Router><App {...getServerProps({})}/></Router></React.StrictMode>,{onRecoverableError:handleHydrationError});
     }
     window.__REACT_HYDRATE__()

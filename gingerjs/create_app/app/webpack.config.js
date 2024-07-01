@@ -17,33 +17,38 @@ if(fs.existsSync(path.resolve(__dirname, "src","global.css"))){
 }
 
 const entry_output = {
-  mode: "development",
+  mode: MODE,
   entry: entry,
   output: {
     path: path.resolve(__dirname, "build", "static"),
     filename: 
       MODE === "development"
-      ? path.join("./","js","[name].buundle.js")
-      : path.join("./","js","[name].[contenthash].js"),
+      ? path.join("./","js","[name].[contenthash].js")
+      : path.join("./","js","[name].[contenthash:8].js"),
+    chunkFilename: 
+      MODE === "development"
+      ? path.join("./","js","[name].[contenthash].js")
+      : path.join("./","js","[name].[contenthash:8].js"),
+    library: '[name]',
     publicPath: "/static"
   }
 }
 
 const config = {
   ...entry_output,
+  devtool: MODE === "development" ? "inline-source-map" : false,
   optimization: {
+    minimize: MODE!=="development",
     splitChunks: {
+      chunks:"async",
       cacheGroups: {
         commons: {
-          chunks: "all",
+          chunks: "async",
           test: /[\\/]node_modules[\\/]/,
           name: __dirname.split("/")[__dirname.split("/").length - 1].split(" ").join("")
         }
       }
     }
-  },
-  stats: {
-    assets: true
   },
   module: {
     rules: [

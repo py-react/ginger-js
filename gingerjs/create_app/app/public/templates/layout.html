@@ -23,6 +23,17 @@
     {% if not error %}
       <script class="serverScript">
           window.flask_react_app_props = {{react_props | tojson}};
+          window.__body_style__ = JSON.parse(JSON.stringify(window.getComputedStyle(document.body)))
+          window.__disableScroll__ = function(){
+              document.body.style.overflow = 'hidden';
+              document.body.style.position = 'fixed';
+          
+          };
+          window.__enableScroll__ = function(){
+            document.body.style.overflow = window.__body_style__.overflow;
+            document.body.style.position = window.__body_style__.position;
+          };
+          window.__disableScroll__()
       </script>
     {% endif %}
     {% endautoescape %}
