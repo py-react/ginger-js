@@ -1,6 +1,6 @@
 NAME="GingerJs"
 VERSION="1.0"
-PACKAGE_MANAGER="npm",
+PACKAGE_MANAGER="npm"
 DEBUG=True
 PORT="5001"
 HOST = "0.0.0.0"

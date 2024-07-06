@@ -179,7 +179,7 @@ def create_app():
     click.echo("App set up completed")
     click.echo("Installing packages")
     package_manager = settings.get('PACKAGE_MANAGER')
-    subprocess.run(["yarn" if package_manager == "yarn" else "npm i"], cwd=cwd)
+    subprocess.run(["yarn" if package_manager == "yarn" else "npm", "install"], cwd=cwd)
     click.echo("Packages installed")
     click.echo("Run your app using : gingerjs runserver")
   except subprocess.CalledProcessError as e:
