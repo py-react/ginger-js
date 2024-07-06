@@ -1,7 +1,10 @@
 import os
 import traceback
-from flask import render_template_string
+from flask import render_template_string,request
 from werkzeug.exceptions import BadRequest,InternalServerError
+from gingerjs.create_app.load_settings import load_settings
+
+settings = load_settings
 
 exception_template = """
 {% extends "layout.html" %}
@@ -114,13 +117,15 @@ def exception(bridge):
         }
         print(response["error"])
         print(f"Traceback: {response['traceback']}")
-        if os.environ.get("DEBUG") == "True":
-        # if False:
-            return render_template_string(exception_template_debug,error=True,msg={response["error"]},stack=response['traceback'],name={response['exception_type']}),e.code
+        meta = {
+            "title": request.path+"?"+str(request.query_string,"utf-8")
+        }
+        if settings.get("DEBUG") or False:
+            return render_template_string(exception_template_debug,error=True,meta_info=meta,msg={response["error"]},stack=response['traceback'],name={response['exception_type']}),e.code
         else:
             if isinstance(e, BadRequest):
-                return render_template_string(bad_request_exception_template,error=True),e.code
+                return render_template_string(bad_request_exception_template,error=True,meta_info=meta),e.code
             if isinstance(e, InternalServerError):
-                return render_template_string(internal_server_exception_template,error=True),e.code
-            return render_template_string(exception_template,error=True,msg=msg,name=errorName),e.code
+                return render_template_string(internal_server_exception_template,error=True,meta_info=meta),e.code
+            return render_template_string(exception_template,error=True,msg=msg,name=errorName,meta_info=meta),e.code
     return handle_exception

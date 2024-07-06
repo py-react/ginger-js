@@ -1,13 +1,15 @@
 import os
 import re
 import subprocess
+from gingerjs.create_app.load_settings import load_settings
 
 class Logger():
     def __init__(self, name):
+        self.settings = load_settings()
         self.name = name
     
     def debug(self, *args, **kwargs):
-        if os.environ.get("DEBUG") == "true" or False:
+        if self.settings.get("DEBUG") or False:
             print(*args, **kwargs)
     
     def info(self, *args, **kwargs):
@@ -475,6 +477,7 @@ def generate_main_client_entry():
     const timeOfRender = new Date()
   
     window.__REACT_HYDRATE__ = function(url){
+        if(!container) return
         hydrateRoot(container,<React.StrictMode><Router><App {...getServerProps({})}/></Router></React.StrictMode>,{onRecoverableError:handleHydrationError});
     }
     window.__REACT_HYDRATE__()
@@ -536,8 +539,10 @@ def generate_static_router_wrapper():
     '''
 
 def create_app():
+    settings = load_settings()
+    package_manager = settings.get('PACKAGE_MANAGER')
     my_env = os.environ.copy()
-    debug = os.environ.get("DEBUG") == "True" or False
+    debug = settings.get("DEBUG") or False
     cwd = os.getcwd()
     if cwd is None:
         raise ValueError("Current working directory not provided")
@@ -570,7 +575,9 @@ def create_app():
     with open(os.path.join(cwd, "__build__", "GenericNotFound.jsx"), "w") as file:
         file.write(generic_not_found())
 
-    subprocess.run(["yarn", "babel", "--extensions", ".js,.jsx", "./__build__", "-d", "./build/app"], cwd=base,check=True)
+
+
+    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "babel", "--extensions", ".js,.jsx", "./__build__", "-d", "./build/app"], cwd=base,check=True)
     if not debug:
         subprocess.run(["rm", "-rf", "./__build__"], check=True, cwd=cwd)
     babel_command = [
@@ -578,16 +585,17 @@ def create_app():
         'babel',
     ]
     subprocess.run(babel_command, cwd=base, env=my_env)
-    subprocess.run(["yarn", "webpack", "--stats-error-details"], cwd=base, check=True, env=my_env)
+    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "webpack", "--stats-error-details"], cwd=base, check=True, env=my_env)
     
-
-
     copy_index = [
         "cp",
         "./public/templates/index.html",
         "./build/templates/index.html"
     ]
     subprocess.run(copy_index, cwd=base, check=True)
+
+    if not os.path.exists(f"{base}/public/static/"):
+        os.makedirs(f"{base}/public/static/")
 
     copy_static = [
         "cp",

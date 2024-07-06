@@ -21,20 +21,35 @@
     {% autoescape false %}
     {% block content %}{% endblock %}
     {% if not error %}
-      <script class="serverScript">
-          window.flask_react_app_props = {{react_props | tojson}};
-          window.__body_style__ = JSON.parse(JSON.stringify(window.getComputedStyle(document.body)))
-          window.__disableScroll__ = function(){
-              document.body.style.overflow = 'hidden';
-              document.body.style.position = 'fixed';
-          
-          };
-          window.__enableScroll__ = function(){
-            document.body.style.overflow = window.__body_style__.overflow;
-            document.body.style.position = window.__body_style__.position;
-          };
-          window.__disableScroll__()
-      </script>
+    <script class="serverScript">
+      // Function to convert computed style object to a JSON string
+        function computedStyleToJSON(computedStyle) {
+          let styleObj = {};
+          styleObj["overflow-x"] = computedStyle.getPropertyValue("overflow-x")
+          styleObj["overflow-y"] = computedStyle.getPropertyValue("overflow-y")
+          // for (let i = 0; i < computedStyle.length; i++) {
+          //     let propName = computedStyle[i];
+          //     let propValue = computedStyle.getPropertyValue(propName);
+          //     styleObj[propName] = propValue;
+          // }
+          return styleObj;
+        }
+        window.flask_react_app_props = {{react_props | tojson}};
+        if(!("__body_style__" in window)){
+          window.__body_style__ = computedStyleToJSON(window.getComputedStyle(document.body));
+        }
+        window.__disableScroll__ = function(){
+            document.body.style["overflow-x"] = 'hidden';
+            document.body.style["overflow-y"] = 'hidden';
+        
+        };
+        window.__enableScroll__ = function(){
+
+          document.body.style["overflow-x"] = window.__body_style__["overflow-x"];
+          document.body.style["overflow-y"] = window.__body_style__["overflow-y"];
+        };
+        window.__disableScroll__()
+    </script>
     {% endif %}
     {% endautoescape %}
   </body>

@@ -1,4 +1,3 @@
-import os
 from flask import render_template,request
 from gingerjs.SSR import ssr
 
