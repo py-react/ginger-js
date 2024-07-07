@@ -31,6 +31,11 @@ class JSBridge:
         # socket_path = os.path.join(dir_path, f"unix_{os.getpid()if os.environ.get('DEBUG','False')=='False'else'dev'}.sock")
         # Start the Node.js server as a subprocess
         node_process_path = os.path.join(dir_path, "unix_sock.js")
+        if(os.path.exists(socket_path)):
+            try:
+                os.remove(socket_path)
+            except Exception as e:
+                self.debug_log(f"An Error occured when removing unix.sock file")
         self.node_process = subprocess.Popen(['node', node_process_path,f"debug={os.environ.get('DEBUG','False')}",f'cwd={os.getcwd()}',f"sock_path={socket_path}"])
         self.debug_log(f"Booted worker with pid : {self.node_process.pid}")
         # Create a Unix socket

@@ -8,6 +8,74 @@ import signal
 import sys
 import time
 from gingerjs.create_app.load_settings import load_settings
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+import psutil
+
+def find_process_by_port(port):
+    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        try:
+            for conn in proc.connections():
+                if conn.laddr.port == port:
+                    return proc
+        except psutil.AccessDenied:
+            continue
+        except psutil.NoSuchProcess:
+            continue
+    return None
+
+def kill_process(process):
+    try:
+        process.terminate()  # or process.kill() for forceful termination
+    except psutil.NoSuchProcess:
+        pass
+
+class ChangeHandler(FileSystemEventHandler):
+    def __init__(self, command,cwd):
+        self.command = command
+        self.process = None
+        self.cwd = cwd
+        self.settings = load_settings()
+        self.my_env = os.environ.copy()  # Copy the current environment
+        for key, value in self.settings.items():
+            self.my_env[key] = str(value)
+        self.my_env["DEBUG"] = str(True)
+        self.process = subprocess.Popen(self.command, shell=True,env=self.my_env)
+    
+    def debug_log(self, *args, **kwargs):
+        if self.my_env["DEBUG"]:
+            print(*args, **kwargs)
+
+    def on_any_event(self, event):
+        # Ignore events in __pycache__ directories
+        if '__pycache__' in event.src_path:
+            return
+        if event.is_directory:
+            return
+        self.debug_log(f"* Detected change in {event.src_path} ,reloading")
+        self.restart()
+
+    def kill(self):
+        if self.process:
+            try:
+                process_to_kill = find_process_by_port(5001)
+                if process_to_kill:
+                    self.debug_log(f"Found process {process_to_kill.pid} on port {5001}. Killing...")
+                    kill_process(process_to_kill)
+                    self.debug_log("Process terminated.")
+                else:
+                    self.debug_log(f"No process found on port {5001}.")
+            except Exception as e:
+                self.process.kill()
+
+    def restart(self):
+        self.kill()
+        self.settings = load_settings()
+        self.my_env = os.environ.copy()  # Copy the current environment
+        for key, value in self.settings.items():
+            self.my_env[key] = str(value)
+        self.my_env["DEBUG"] = str(True)
+        self.process = subprocess.Popen(self.command, shell=True,env=self.my_env)
 
 
 class Logger():
@@ -86,8 +154,13 @@ def copy_file_if_not_exists(src, dst,copyFunc):
     if os.path.exists(dst):
         click.echo(f"The file {src} already exists. Operation skipped.")
     else:
-        copyFunc(src, dst)
-        click.echo(f"Copied {src} to {dst}.")
+        if os.path.exists(src):
+            copyFunc(src, dst)
+            click.echo(f"Copied {src} to {dst}.")
+        else:
+            click.echo(f"The file {src} doesn't exists. Operation skipped.")
+            raise f"The file {src} doesn't exists"
+
 
 @click.group()
 def cli():
@@ -186,9 +259,26 @@ def create_app():
         click.echo(f"Error: {e}", err=True)
 
 @cli.command()
-def runserver():
+@click.argument('mode',required=False)
+def runserver(mode):
     """Runs the webapp"""
     try:
+        if mode == "dev":
+            click.echo("Building app in in watch mode")
+            path = "./src"
+            command = " ".join(["gingerjs","build","&&", "python","main.py"])
+            event_handler = ChangeHandler(command,base)
+            observer = Observer()
+            observer.schedule(event_handler, path, recursive=True)
+            observer.start()
+            try:
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                observer.stop()
+            observer.join()
+            return
+        
         settings = load_settings()
         my_env = os.environ.copy()  # Copy the current environment
         my_env["GINGERJS_APP_DIR"] = base
@@ -198,10 +288,6 @@ def runserver():
         subprocess.run(["python","main.py"], check=True, cwd=base,env=my_env)
     except subprocess.CalledProcessError as e:
         click.echo(f"Error: {e}", err=True)
-
-
-
-
 
 if __name__ == '__main__':
     cli()

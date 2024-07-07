@@ -107,6 +107,7 @@ try {
     connection.on("end", () => {
         debug_log("Client disconnected");
         // Perform cleanup if needed
+        
     });
 
     connection.on("error", (err) => {

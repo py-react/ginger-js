@@ -468,6 +468,80 @@ def generate_main_client_entry():
     }}
     function handleHydrationError(error,errorInfo) {
         console.error('Hydration error:', {error,errorInfo});
+
+        // Create the error overlay elements
+        const overlay = document.createElement('div');
+        overlay.id = 'error-overlay';
+
+        const messageBox = document.createElement('div');
+        messageBox.id = 'error-message';
+
+        const closeButton = document.createElement('button');
+        closeButton.id = 'close-overlay';
+        closeButton.textContent = 'Close';
+
+        const title = document.createElement('h2');
+        title.textContent = error.message;
+
+        const details = document.createElement('pre');
+        details.id = 'error-details';
+        details.innerHTML = error.stack;
+
+        // Append elements
+        messageBox.appendChild(closeButton);
+        messageBox.appendChild(title);
+        messageBox.appendChild(details);
+        overlay.appendChild(messageBox);
+        document.body.appendChild(overlay);
+
+        // Add styles using JavaScript
+        overlay.style.position = 'fixed';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+        overlay.style.color = 'white';
+        overlay.style.display = 'flex';
+        overlay.style.justifyContent = 'center';
+        overlay.style.alignItems = 'center';
+        overlay.style.zIndex = '1000';
+
+        messageBox.style.background = "rgba(254, 226, 226,1)";
+        messageBox.style.padding = '20px';
+        messageBox.style.borderRadius = '5px';
+        messageBox.style.maxWidth = '80%';
+        messageBox.style.maxHeight = '80%';
+        messageBox.style.overflow = 'auto';
+        messageBox.style.color = 'rgb(185, 28, 28 ,1 )';
+
+        title.style.marginTop = '0';
+
+        details.style.whiteSpace = 'pre-wrap';
+        details.style.marginTop = '10px';
+
+        closeButton.style.backgroundColor = '#ff5e5e';
+        closeButton.style.border = 'none';
+        closeButton.style.borderRadius = '4px';
+        closeButton.style.color = 'white';
+        closeButton.style.padding = '8px';
+        closeButton.style.cursor = 'pointer';
+        closeButton.style.float = 'right';
+
+        closeButton.addEventListener('mouseover', () => {
+        closeButton.style.backgroundColor = '#ff1e1e';
+        });
+
+        closeButton.addEventListener('mouseout', () => {
+        closeButton.style.backgroundColor = '#ff5e5e';
+        });
+
+        // Close button functionality
+        closeButton.addEventListener('click', () => {
+        overlay.style.display = 'none';
+        });
+        throw new Error(error)
+
         // Run your specific function here
         // e.g., log to a service, display a fallback UI, etc.
     }
@@ -605,9 +679,6 @@ def create_app():
     ]
     subprocess.run(copy_static, cwd=base, check=True)
 
-    for root,_,files in os.walk(f'{cwd}/build'):
-        if '__init__.py' not in files:
-            open(f'{root}/__init__.py', 'w+')
 
     
     

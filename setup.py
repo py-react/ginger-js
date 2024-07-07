@@ -35,7 +35,9 @@ setup(
         "sqlparse==0.5.0",
         "tornado==6.4",
         "urllib3==2.2.1",
-        "Werkzeug==3.0.2"
+        "Werkzeug==3.0.2",
+        "watchdog==4.0.1",
+        "psutil==6.0.0"
     ],
     entry_points={
         'console_scripts': [
