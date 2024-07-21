@@ -1,22 +1,27 @@
 import os
-from flask import request,render_template
 from gingerjs.SSR import ssr,partial_ssr
+from fastapi import  Request
+from fastapi.responses import  Response
 
-def view(module,bridge):
-    def view_func(**kwargs):
-        if("favicon" in request.path):
-            return ""
+async def static_route_func():
+    return {}
+
+
+def view(module,bridge,app,static_route=False):
+    async def view_func(request: Request):
+        if request.url.path.endswith(".ico") or request.url.path.endswith(".js.map") or request.url.path.endswith(".js") or request.url.path.endswith(".css"):
+            raise Response(status_code=404)
+        
         props = None
         layout_props = {}
-        if hasattr(request,"prop_data"):
-            layout_props = request.prop_data
-            delattr(request,"prop_data")
+        if hasattr(request.state,"prop_data"):
+            layout_props = request.state.prop_data
+            delattr(request.state,"prop_data")
         # so actual controller of the view will not get this extra attr
-        kwargs.setdefault("request", request)
-        if len(tuple(kwargs.values())):
-            props = module.index(**kwargs)
-        else:
-            props = module.index()
+        if not static_route:
+            props = await module.index(request)
+        elif static_route:
+            props = await static_route_func()
 
         if props == None:
             props = {}
@@ -26,9 +31,9 @@ def view(module,bridge):
         props["location"] = {}
         props["layout_props"] = layout_props
         
-        props['location']["path"] = request.path
+        props['location']["path"] = request.url.path
         # props['location']['baseUrl'] = req.base_url
-        props['location']['query'] = str(request.query_string,"utf-8")
+        props['location']['query'] = request.url.query
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             toRender = partial_ssr(bridge,props)
         else:
@@ -42,6 +47,7 @@ def view(module,bridge):
             "title": "GingerJs"
         }
         if hasattr(module, 'meta_data'):
-            meta = module.meta_data()
-        return render_template("index.html",react_context=toRender,react_props=props,meta_info=meta)
+            meta = await module.meta_data()
+
+        return app.TemplateResponse(request=request,name="index.html",context={"react_context":toRender,"react_props":props,"meta_info":meta},status_code=200)
     return view_func

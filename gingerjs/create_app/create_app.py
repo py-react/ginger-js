@@ -661,12 +661,15 @@ def create_app():
     subprocess.run(babel_command, cwd=base, env=my_env)
     subprocess.run(["yarn" if package_manager == "yarn" else "npx", "webpack", "--stats-error-details"], cwd=base, check=True, env=my_env)
     
-    copy_index = [
-        "cp",
-        "./public/templates/index.html",
-        "./build/templates/index.html"
-    ]
-    subprocess.run(copy_index, cwd=base, check=True)
+    for dirpath, _, filenames in os.walk(os.path.join(base,"public","templates")):
+        for filename in filenames:
+            if filename != "layout.html":
+                copy_index = [
+                    "cp",
+                    f"./public/templates/{filename}",
+                    f"./build/templates/{filename}"
+                ]
+                subprocess.run(copy_index, cwd=base, check=True)
 
     if not os.path.exists(f"{base}/public/static/"):
         os.makedirs(f"{base}/public/static/")

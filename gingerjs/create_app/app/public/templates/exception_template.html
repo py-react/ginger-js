@@ -1,0 +1,16 @@
+{% extends "layout.html" %}
+
+{% block title %}Exception{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:center;min-height:100vh">
+    <div style="max-width: 28rem; width: 100%; padding-left: 1.5rem; padding-right: 1.5rem; padding-top: 3rem; padding-bottom: 3rem; border-radius: 0.5rem;">
+        <div style="text-align:center">
+            <h1 style="font-size: 1.875rem; line-height: 2.25rem; font-weight: 700;">{{name|safe}}</h1>
+            <p style="color: #4B5563; margin-top: 0.5rem; text-align: center;">
+                {{msg|safe}}
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

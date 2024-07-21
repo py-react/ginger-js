@@ -40,7 +40,8 @@ class ChangeHandler(FileSystemEventHandler):
         for key, value in self.settings.items():
             self.my_env[key] = str(value)
         self.my_env["DEBUG"] = str(True)
-        self.process = subprocess.Popen(self.command, shell=True,env=self.my_env)
+        for command in self.command:
+            self.process = subprocess.run(command, shell=True,env=self.my_env)
     
     def debug_log(self, *args, **kwargs):
         if self.my_env["DEBUG"]:
@@ -56,15 +57,16 @@ class ChangeHandler(FileSystemEventHandler):
         self.restart()
 
     def kill(self):
-        if self.process:
+        if len(self.process):
+            
             try:
-                process_to_kill = find_process_by_port(5001)
+                process_to_kill = find_process_by_port(self.settings.get("PORT"))
                 if process_to_kill:
                     self.debug_log(f"Found process {process_to_kill.pid} on port {5001}. Killing...")
                     kill_process(process_to_kill)
                     self.debug_log("Process terminated.")
                 else:
-                    self.debug_log(f"No process found on port {5001}.")
+                    self.debug_log(f"No process found on port {self.settings.get('PORT')}.")
             except Exception as e:
                 self.process.kill()
 
@@ -194,7 +196,12 @@ def build():
     timing = Execution_time(start_time,"Building app")
     click.echo("Building app")
     my_env = os.environ.copy()
-    subprocess.run(['python', f"{os.path.join(dir_path,'create_app.py')}"], check=True,env=my_env)
+    node_process = None
+    try:
+        node_process=subprocess.run(["gingerjs","cra"], check=True,cwd=base,env=my_env)
+    except  Exception as e:
+        if node_process is not None:
+            node_process.kill()
     end_time = time.time()
     timing.end(end_time)
 
@@ -215,8 +222,12 @@ def dev_build(mode):
         '--watch', 'webpack.config.js',
         '--exec', 'gingerjs build'
     ]
-
-    subprocess.run(command,cwd=base,env=my_env)
+    node_process = None
+    try:
+        node_process = subprocess.run(command,cwd=base,env=my_env)
+    except  Exception as e:
+        if node_process is not None:
+            node_process.kill()
 
 @cli.command()
 def cra():
@@ -236,7 +247,7 @@ def create_app():
     create_dir(cwd)
     copy_file_if_not_exists(f"{os.path.dirname(os.path.abspath(__file__))}/app/settings.py",os.path.join(cwd,"settings.py"),shutil.copy) # flask app
     click.echo("Setting up flask app")
-    copy_file_if_not_exists(f"{os.path.dirname(os.path.abspath(__file__))}/app/flask/main.py",os.path.join(cwd,"main.py"),shutil.copy) # flask app
+    copy_file_if_not_exists(f"{os.path.dirname(os.path.abspath(__file__))}/app/main.py",os.path.join(cwd,"main.py"),shutil.copy) # flask app
     click.echo("flask app set complete")
     click.echo("Setting up app")
     copy_file_if_not_exists(f"{os.path.dirname(os.path.abspath(__file__))}/app/package.json",os.path.join(cwd,"package.json"),shutil.copy)
@@ -247,8 +258,8 @@ def create_app():
     copy_file_if_not_exists(f"{os.path.dirname(os.path.abspath(__file__))}/app/components.json",os.path.join(cwd,"components.json"),shutil.copy)
     copy_file_if_not_exists(f"{os.path.dirname(os.path.abspath(__file__))}/app/public/",f"{cwd}/public/", shutil.copytree)
     copy_file_if_not_exists(f"{os.path.dirname(os.path.abspath(__file__))}/app/src/",f"{cwd}/src/", shutil.copytree)
-    create_dir(f"{os.path.dirname(os.path.abspath(__file__))}/app/src/components")
-    create_dir(f"{os.path.dirname(os.path.abspath(__file__))}/app/src/libs")
+    create_dir(os.path.join(cwd,"public","static"))
+    create_dir(os.path.join(cwd,"app","src","components"))
     click.echo("App set up completed")
     click.echo("Installing packages")
     package_manager = settings.get('PACKAGE_MANAGER')
@@ -263,10 +274,12 @@ def create_app():
 def runserver(mode):
     """Runs the webapp"""
     try:
+        settings = load_settings()
+        my_env = os.environ.copy()  # Copy the current environment
         if mode == "dev":
             click.echo("Building app in in watch mode")
             path = "./src"
-            command = " ".join(["gingerjs","build","&&", "python","main.py"])
+            command = " ".join(["gingerjs","build","&&","uvicorn","main:app","--port",settings.get("PORT"),"--host",settings.get("HOST")])
             event_handler = ChangeHandler(command,base)
             observer = Observer()
             observer.schedule(event_handler, path, recursive=True)
@@ -275,17 +288,26 @@ def runserver(mode):
                 while True:
                     time.sleep(1)
             except KeyboardInterrupt:
+                observer.kill()
                 observer.stop()
             observer.join()
             return
         
-        settings = load_settings()
-        my_env = os.environ.copy()  # Copy the current environment
         my_env["GINGERJS_APP_DIR"] = base
         for key, value in settings.items():
             my_env[key] = str(value)
-        subprocess.run(["gingerjs","build"], check=True,cwd=base,env=my_env)
-        subprocess.run(["python","main.py"], check=True, cwd=base,env=my_env)
+
+        build_node_process = None
+        node_process = None
+        try:
+            build_node_process = subprocess.run(["gingerjs","build"], check=True,cwd=base,env=my_env)
+            node_process = subprocess.run(["uvicorn","main:app","--port",settings.get("PORT"),"--host",settings.get("HOST")], check=True, cwd=base,env=my_env)
+        except  Exception as e:
+            if build_node_process is not None:
+                build_node_process.kill()
+            if node_process is not None:
+                node_process.kill()
+
     except subprocess.CalledProcessError as e:
         click.echo(f"Error: {e}", err=True)
 

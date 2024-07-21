@@ -1,0 +1,18 @@
+{% extends "layout.html" %}
+
+{% block title %}Bad Request{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:center;min-height:100vh">
+    <div style="max-width: 28rem; width: 100%; padding-left: 1.5rem; padding-right: 1.5rem; padding-top: 3rem; padding-bottom: 3rem; border-radius: 0.5rem;">
+    <div style="display:flex;align-items:center;justify-content:center;flex-direction:column">
+        <h1 style="font-size: 8rem;line-height: 1;color: rgb(17 24 39);margin:0" class="font-bold text-gray-900 dark:text-gray-50">400</h1>
+        <h1 style="font-size: 1.875rem; line-height: 2.25rem; font-weight: 700; margin-top: 1rem;">Bad Request</h1>
+        <p style="color: #4B5563; margin-top: 0.5rem; text-align: center;">
+            oops, it looks like you've encountered a 400 Bad Request error. This means the server couldn't understand the
+          request you sent.
+        </p>
+    </div>
+    </div>
+</div>
+{% endblock %}

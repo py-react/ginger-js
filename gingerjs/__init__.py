@@ -7,11 +7,11 @@ def prepare_bridge(**kwargs):
     bridge.initialize(debug= kwargs.get("debug",False))
     return bridge
 
-def add_url_rules(root_folder,app,**kwargs):
+def add_url_rules(app,**kwargs):
     bridge = prepare_bridge(**kwargs)
     
-    api_routes = os.path.join(root_folder,"api")
+    api_routes = os.path.join(app.root_path,"api")
     define_routes(app,api_routes,"api",bridge,debug=kwargs.get("debug",False))
 
-    view_routes = root_folder
+    view_routes = app.root_path
     define_routes(app,view_routes,"view",bridge,debug=kwargs.get("debug",False))

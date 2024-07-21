@@ -1,2 +1,2 @@
-def index(request):
+async def index(request):
     return {"api":"test"}

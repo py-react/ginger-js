@@ -50,7 +50,7 @@ class SSR {
     this.cwd = cwd
   }
   async render(props) {
-    return new Promise((resolve, reject) => {
+    return new Promise(async(resolve, reject) => {
       try {
         const App = require(path.resolve("./", "build", "app", "app.js"));
         const StaticRouter = require(path.resolve(
@@ -58,6 +58,12 @@ class SSR {
           "build",
           "app",
           "StaticRouterWrapper.js"
+        ));
+        const {getAppContext} = require(path.resolve(
+          "./",
+          "build",
+          "app",
+          "layout.js"
         ));
         const { location } = props;
         const ReactElement = React.createElement(App.default, {
@@ -69,24 +75,43 @@ class SSR {
           children: ReactElement,
           url: props.location.path,
         });
-        const componentHTML =
-          ReactDOMServer.renderToPipeableStream(StaticRouterWrapper);
-        
-        // Create an instance of the logging writable stream
-        const loggingWritableStream = new LoggingWritableStream();
-        const loggingTransformStream = new LoggingTransformStream();
-        componentHTML.pipe(loggingTransformStream).pipe(loggingWritableStream);
-        // After the stream has ended, the concatenated string can be accessed
-        loggingWritableStream.on("finish", () => {
-          resolve(loggingWritableStream.renderString())
-        });
+        const providedCtx = {
+          app:StaticRouterWrapper,
+          renderApp:()=>({
+            enhanceApp:(App)=>App,
+            getStyles:(App)=>App,
+            styles:()=>"",
+            finally:()=>{}
+          })
+        }
+        const renderApp = (render)=>{
+          const rendered = render.renderApp();
+          const componentHTML =
+            ReactDOMServer.renderToPipeableStream(rendered.getStyles(StaticRouterWrapper));
+          
+          // Create an instance of the logging writable stream
+          const loggingWritableStream = new LoggingWritableStream();
+          const loggingTransformStream = new LoggingTransformStream();
+          componentHTML.pipe(loggingTransformStream).pipe(loggingWritableStream);
+          // After the stream has ended, the concatenated string can be accessed
+          loggingWritableStream.on("finish", () => {
+            resolve(loggingWritableStream.renderString().concat(rendered.styles()))
+            rendered.finally()
+          });
+        }
+        if(typeof getAppContext === "function"){
+          Object.assign(providedCtx, await getAppContext(providedCtx));
+        }
+        renderApp(providedCtx)
+
       } catch (error) {
         console.log(error,"error")
         reject(error);
       }
     })
   }
-
+  
+ // beta
   async partialRender(props){
     return new Promise((resolve, reject) => {
       // const Component = require(path.resolve("./", "build", "app", "app.js"));
