@@ -1,5 +1,6 @@
 include readme.md
 include LICENSE
 recursive-include gingerjs/create_app/app *.*
+recursive-include gingerjs/create_app/ *.js
 recursive-include gingerjs/SSR *.js
 include gingerjs/js_bridge/unix_sock.js

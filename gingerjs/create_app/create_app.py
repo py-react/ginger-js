@@ -2,6 +2,30 @@ import os
 import re
 import subprocess
 from gingerjs.create_app.load_settings import load_settings
+import shutil
+import importlib.util
+
+
+def load_module(module_name,module_path):
+    try:
+        module_name = module_name
+        spec = importlib.util.spec_from_file_location(module_name, module_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    except Exception as e:
+        raise e
+
+def copy_file_if_not_exists(src, dst,copyFunc):
+    if os.path.exists(dst):
+        logger.debug(f"The file {src} already exists. Operation skipped.")
+    else:
+        if os.path.exists(src):
+            copyFunc(src, dst)
+            logger.debug(f"Copied {src} to {dst}.")
+        else:
+            logger.debug(f"The file {src} doesn't exists. Operation skipped.")
+            raise f"The file {src} doesn't exists"
 
 class Logger():
     def __init__(self, name):
@@ -239,10 +263,10 @@ def generate_import_statements(obj):
         nonlocal imports
         if isinstance(node, str):
             component_name = generate_component_name(node)
-            if "/app.jsx" not in node:
+            if os.path.sep+"app.jsx" not in node:
                 file_data = open(node, "r").read()
                 # if "use client" in file_data:
-                imports.append(f"""const {component_name} = React.lazy(() => import('{node.replace("/src/", "/build/").replace(".jsx", ".js")}'));""")
+                imports.append(f"""const {component_name} = React.lazy(() => import('{node.replace(os.path.sep.join(["","src",""]), os.path.sep.join(["","_gingerjs","build",""])).replace(".jsx", ".js")}'));""")
                 # else:
                 # imports.append(f'import {component_name} from "{node.replace("/src/", "/build/").replace(".jsx", ".js")}";')
 
@@ -259,7 +283,7 @@ def create_react_app_with_routes(paths, debug):
             nodes = {}
         for component_path in components_paths:
             relative_path = component_path.split("src")[1]
-            paths = list(filter(None, relative_path.split("/")))  # Remove empty strings from split
+            paths = list(filter(None, relative_path.split(os.path.sep)))  # Remove empty strings from split
             current = nodes
             for i in range(len(paths) - 1):
                 key = paths[i]
@@ -268,11 +292,14 @@ def create_react_app_with_routes(paths, debug):
         return nodes
 
     node_data = create_nodes(paths)
+
+    importErrCompo = f'import Error from ".{os.path.sep}Error"' if debug else ""
+
     to_return = [
         f"""
-        import React, {{ useState, useEffect,useRef }} from 'react';
-        {'import Error from "./Error"' if debug else ""}
-        import GenericNotFound from "./GenericNotFound"   
+        import React, {{ useState, useEffect,useRef,useCallback }} from 'react';
+        {importErrCompo}
+        import GenericNotFound from ".{os.path.sep}GenericNotFound"   
         import {{ BrowserRouter as Router, Route, Routes, Outlet, useLocation }} from 'react-router-dom';     
         import {{ Redirect, matchPath }} from 'react-router';
 
@@ -318,6 +345,43 @@ def create_react_app_with_routes(paths, debug):
               </div>
         }})
 
+        const _ProgressBar = ({{isLoading}}) => {{
+            const [progress, setProgress] = useState(0);
+            const [loading, setLoading] = useState(isLoading);
+            useEffect(() => {{
+                let interval;
+                if (isLoading) {{
+                setLoading(true);
+                setProgress(0);
+                interval = setInterval(() => {{
+                    setProgress((prev) => {{
+                        if (prev < 90) {{
+                            if(prev+1===100){{
+                                return prev
+                            }}
+                            return prev + 0.5; // Adjust the increment as needed for smoother progress
+                        }}
+                        return prev;
+                    }});
+                }}, 50); // Adjust the interval duration as needed
+                }} else {{
+                    setProgress(100); // complete the progress bar
+                    setTimeout(() => setLoading(false), 500); // wait for the completion transition
+                }}
+
+                return () => clearInterval(interval);
+            }}, [isLoading]);
+
+            if (!loading) return null;
+
+            return (
+                <div className="backdrop">
+                    <div className="progress-bar" style={{{{ width: `${{progress}}%` }}}}></div>
+                </div>
+            );
+        }};
+
+
         const PropsProvider = ({{Element,Fallback,...props}})=>{{
             const location = useLocation()
             const [loading,setLoading] = useState(true)
@@ -333,12 +397,10 @@ def create_react_app_with_routes(paths, debug):
 
             useEffect(()=>{{
                 setLoading(true)
-                window.__disableScroll__()
                 React.startTransition(() => {{
                     const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
                     setPropData(data)
                     setLoading(false)
-                    window.__enableScroll__()
                 }});
                 return ()=>{{
                     setLoading(false)
@@ -346,24 +408,9 @@ def create_react_app_with_routes(paths, debug):
             }},[location])
             
             return (
-                <React.Suspense fallback={{<Fallback />}}>
+                <React.Suspense fallback={{<_ProgressBar isLoading={{loading}} />}}>
                     <Element {{...propsData}} />
-                    <div style={{{{
-                            position: "absolute",
-                            top:0,
-                            left:0,
-                            padding:"1rem",
-                            minWidth:"100vw",
-                            minHeight:"100vh",
-                            zIndex:99999999999,
-                            background:"rgb(255 255 255 / 0.5)",
-                            display:(loading && Fallback) ? "flex":"none",
-                            justifyContent:"center",
-                            alignItems:"center"
-                        }}}}
-                        >
-                            <Fallback />
-                        </div>
+                    <_ProgressBar isLoading={{loading}} />
                 </React.Suspense >
             )
         }}
@@ -449,25 +496,25 @@ def create_react_app_with_routes(paths, debug):
     return "\n".join(to_return)
 
 def generate_main_client_entry():
-    return '''
-    import React,{useState,useEffect} from 'react';
-    import Router from "./BrowserRouterWrapper"
+    return f'''
+    import React,{{useState,useEffect}} from 'react';
+    import Router from ".{os.path.sep}BrowserRouterWrapper"
     import ReactDOM from 'react-dom';
-    import { hydrateRoot,createRoot } from 'react-dom/client';
-    import App from "./app"
+    import {{ hydrateRoot,createRoot }} from 'react-dom{os.path.sep}client';
+    import App from ".{os.path.sep}app"
     function getServerProps(props) {{
-        try {
-            if (window !== undefined) {
+        try {{
+            if (window !== undefined) {{
                 const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
-                return { ...data,...props };
-            }
-        } catch (error) {
+                return {{ ...data,...props }};
+            }}
+        }} catch (error) {{
             // pass
-        }
+        }}
         return props;
     }}
-    function handleHydrationError(error,errorInfo) {
-        console.error('Hydration error:', {error,errorInfo});
+    function handleHydrationError(error,errorInfo) {{
+        console.error('Hydration error:', {{error,errorInfo}});
 
         // Create the error overlay elements
         const overlay = document.createElement('div');
@@ -528,43 +575,43 @@ def generate_main_client_entry():
         closeButton.style.cursor = 'pointer';
         closeButton.style.float = 'right';
 
-        closeButton.addEventListener('mouseover', () => {
+        closeButton.addEventListener('mouseover', () => {{
         closeButton.style.backgroundColor = '#ff1e1e';
-        });
+        }});
 
-        closeButton.addEventListener('mouseout', () => {
+        closeButton.addEventListener('mouseout', () => {{
         closeButton.style.backgroundColor = '#ff5e5e';
-        });
+        }});
 
         // Close button functionality
-        closeButton.addEventListener('click', () => {
+        closeButton.addEventListener('click', () => {{
         overlay.style.display = 'none';
-        });
+        }});
         throw new Error(error)
 
         // Run your specific function here
         // e.g., log to a service, display a fallback UI, etc.
-    }
+    }}
     
     const container = document.getElementById("root");
 
     const timeOfRender = new Date()
   
-    window.__REACT_HYDRATE__ = function(url){
+    window.__REACT_HYDRATE__ = function(url){{
         if(!container) return
-        hydrateRoot(container,<React.StrictMode><Router><App {...getServerProps({})}/></Router></React.StrictMode>,{onRecoverableError:handleHydrationError});
-    }
+        hydrateRoot(container,<React.StrictMode><Router><App {{...getServerProps({{}})}}/></Router></React.StrictMode>,{{onRecoverableError:handleHydrationError}});
+    }}
     window.__REACT_HYDRATE__()
 
     // Function to handle navigation events
-    function handleNavigation(event) {
-        if(event.state !== null){
+    function handleNavigation(event) {{
+        if(event.state !== null){{
             window.flask_react_app_props = event.state
-        }
+        }}
         // Run your custom function here based on the navigation state
-    }
+    }}
 
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function() {{
         // Define your initial state object
         const initialState = window.flask_react_app_props;
 
@@ -572,11 +619,11 @@ def generate_main_client_entry():
         history.replaceState(initialState, document.title, window.location.href);
 
         // Optionally, dispatch a popstate event to notify the app of the initial state
-        window.dispatchEvent(new PopStateEvent('popstate', { state: initialState }));
+        window.dispatchEvent(new PopStateEvent('popstate', {{ state: initialState }}));
         
         // Add event listener for 'popstate' events
         window.addEventListener('popstate', handleNavigation);
-    });
+    }});
 
     '''
 
@@ -622,69 +669,98 @@ def create_app():
         raise ValueError("Current working directory not provided")
 
     try:
-        subprocess.run(["rm", "-rf", "./build"], check=True,cwd=cwd)
-        subprocess.run(["rm", "-rf", "./__build__"], check=True,cwd=cwd)
-        subprocess.run(["rm", "./public/static/js/app.js"], check=True,cwd=cwd)
+        # Remove the './build' directory
+        build_path = os.path.join(cwd,"_gingerjs")
+        if os.path.exists(build_path):
+            shutil.rmtree(build_path)
+
+        # Remove the './public/static/js/app.js' file
+        app_js_path = os.path.join(cwd, 'public', 'static', 'js', 'app.js')
+        if os.path.exists(app_js_path):
+            os.remove(app_js_path)
+        # subprocess.run(["rm", "-rf", "./build"], check=True,cwd=cwd)
+        # subprocess.run(["rm", "-rf", "./__build__"], check=True,cwd=cwd)
+        # subprocess.run(["rm", "./public/static/js/app.js"], check=True,cwd=cwd)
     except subprocess.CalledProcessError:
         pass
 
-    os.makedirs(os.path.join(cwd, "__build__"), exist_ok=True)
+    os.makedirs(os.path.join(cwd,"_gingerjs"), exist_ok=True)
+    copy_file_if_not_exists(os.path.join(dir_path,"app","main.py"),os.path.join(cwd,"_gingerjs","main.py"),shutil.copy) # flask app
+    with open(os.path.join(cwd,"_gingerjs","__init__.py"), 'w') as file:
+        pass  # 'pass' is used here to do nothing, effectively creating an empty file
 
-    with open(os.path.join(cwd, "__build__", "app.jsx"), "w") as file:
+    os.makedirs(os.path.join(cwd,"_gingerjs","__build__"), exist_ok=True)
+
+    with open(os.path.join(cwd,"_gingerjs", "__build__", "app.jsx"), "w") as file:
         file.write(create_react_app_with_routes(find_jsx_files(os.path.join(cwd, "src", "app")), debug))
 
-    with open(os.path.join(cwd, "__build__", "BrowserRouterWrapper.jsx"), "w") as file:
+    with open(os.path.join(cwd,"_gingerjs", "__build__", "BrowserRouterWrapper.jsx"), "w") as file:
         file.write(generate_browser_router_wrapper())
 
-    with open(os.path.join(cwd, "__build__", "StaticRouterWrapper.jsx"), "w") as file:
+    with open(os.path.join(cwd,"_gingerjs", "__build__", "StaticRouterWrapper.jsx"), "w") as file:
         file.write(generate_static_router_wrapper())
 
-    with open(os.path.join(cwd, "__build__", "main.jsx"), "w") as file:
+    with open(os.path.join(cwd,"_gingerjs", "__build__", "main.jsx"), "w") as file:
         file.write(generate_main_client_entry())
 
     if debug:
-        with open(os.path.join(cwd, "__build__", "Error.jsx"), "w") as file:
+        with open(os.path.join(cwd,"_gingerjs", "__build__", "Error.jsx"), "w") as file:
             file.write(generate_error_component())
 
-    with open(os.path.join(cwd, "__build__", "GenericNotFound.jsx"), "w") as file:
+    with open(os.path.join(cwd,"_gingerjs", "__build__", "GenericNotFound.jsx"), "w") as file:
         file.write(generic_not_found())
 
-
-
-    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "babel", "--extensions", ".js,.jsx", "./__build__", "-d", "./build/app"], cwd=base,check=True)
+    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "babel", "--extensions", ".js,.jsx", os.path.sep.join([".","","_gingerjs","__build__"]), "-d", os.path.sep.join([".","","_gingerjs","build","app"])], cwd=base,check=True,env=my_env)
     if not debug:
-        subprocess.run(["rm", "-rf", "./__build__"], check=True, cwd=cwd)
+        subprocess.run(["rm", "-rf", os.path.sep.join([".","","_gingerjs","__build__"])], check=True, cwd=cwd)
+    module_name = "babel"
+    module = load_module(module_name,os.path.join(dir_path,"main.py"))
+    # if hasattr(module, "babel"):
+    #     module.babel()
     babel_command = [
         'gingerjs',
         'babel',
     ]
     subprocess.run(babel_command, cwd=base, env=my_env)
-    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "webpack", "--stats-error-details"], cwd=base, check=True, env=my_env)
+    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "webpack","--config",os.path.dirname(__file__)+os.sep+"webpack.config.js", "--stats-error-details"], cwd=base, check=True, env=my_env)
     
     for dirpath, _, filenames in os.walk(os.path.join(base,"public","templates")):
         for filename in filenames:
             if filename != "layout.html":
-                copy_index = [
-                    "cp",
-                    f"./public/templates/{filename}",
-                    f"./build/templates/{filename}"
-                ]
-                subprocess.run(copy_index, cwd=base, check=True)
+                # Construct the source and destination paths
+                source_path = os.path.join(base, 'public', 'templates', filename)
+                destination_path = os.path.join(base,"_gingerjs", 'build', 'templates', filename)
 
-    if not os.path.exists(f"{base}/public/static/"):
-        os.makedirs(f"{base}/public/static/")
+                # Create the destination directory if it does not exist
+                os.makedirs(os.path.dirname(destination_path), exist_ok=True)
 
-    copy_static = [
-        "cp",
-        "-R",
-        f"{base}/public/static/",
-        f"{base}/build/static/"
-    ]
-    subprocess.run(copy_static, cwd=base, check=True)
+                # Copy the file
+                shutil.copyfile(source_path, destination_path)
+                
 
+    if not os.path.exists(os.path.join(base,"public","static")):
+        os.makedirs(os.path.join(base,"public","static"),exist_ok=True)
 
-    
-    
+    # Construct the source and destination paths
+    source_path = os.path.join(base, 'public', 'static')
+    destination_path = os.path.join(base, '_gingerjs', 'build', 'static')
 
+    # Function to copy files and directories only if they don't exist at the destination
+    def copy_if_not_exists(src, dest):
+        if not os.path.exists(dest):
+            if os.path.isdir(src):
+                shutil.copytree(src, dest)
+            else:
+                shutil.copy2(src, dest)
 
-create_app()
+    # Iterate through the source directory
+    for root, dirs, files in os.walk(source_path):
+        for name in dirs:
+            src_dir = os.path.join(root, name)
+            dest_dir = os.path.join(destination_path, os.path.relpath(src_dir, source_path))
+            copy_if_not_exists(src_dir, dest_dir)
+        for name in files:
+            src_file = os.path.join(root, name)
+            dest_file = os.path.join(destination_path, os.path.relpath(src_file, source_path))
+            copy_if_not_exists(src_file, dest_file)
+

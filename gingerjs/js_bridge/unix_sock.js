@@ -30,7 +30,7 @@ try {
   const console_log = debug_log;
 
   // const args = process.argv.slice(2);
-  const socketPath = getArgValue("sock_path",path.join(__dirname, `unix.sock`));
+  const socketPath = getArgValue("sock_path",path.join(__dirname,"_gingerjs", `unix.sock`));
   // Remove the socket file if it already exists
   if (fs.existsSync(socketPath)) {
     try {

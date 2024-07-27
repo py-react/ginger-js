@@ -15,7 +15,7 @@ class App(FastAPI):
         super().__init__(**kwargs)
         self.settings = load_settings()
         self.my_env = environ.copy()
-        self.template_folder='build/templates'
+        self.template_folder= path.sep.join(["_gingerjs","build","templates"])
         self.root_path= path.join(getcwd(),"src","app")
         self.setTemplateEngine()
         self.setStaticPath()
@@ -27,7 +27,7 @@ class App(FastAPI):
     
     def setStaticPath(self):
         self.static_url_path='/static'
-        self.static_folder="build/static"
+        self.static_folder=path.sep.join(["_gingerjs","build","static"])
         # self.mount(self.static_url_path,app=StaticFiles(directory="build/static",html=True,check_dir=True,follow_symlink=True), name="static")
         async def serve_static_file(file_path: str):
             file_path_full = path.join(getcwd(),self.static_folder, file_path)

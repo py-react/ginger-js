@@ -21,7 +21,7 @@ setup(
         # List your package dependencies here, e.g.:
         "fastapi==0.111.1",
         "watchdog==4.0.1",
-        "psutil==6.0.0"
+        "psutil==6.0.0",
     ],
     entry_points={
         'console_scripts': [

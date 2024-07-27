@@ -39,6 +39,7 @@ def view(module,bridge,app,static_route=False):
         else:
             toRender = ssr(bridge,props)
         if os.environ.get('DEBUG', "False") == "True":
+            # TODO: check the below, is it still a valid case.
             if ("<template data-stck=" in toRender) or ("<template data-msg=" in toRender):
                 props["hasError"] = "true"
                 props["error"] = toRender

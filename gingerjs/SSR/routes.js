@@ -52,15 +52,17 @@ class SSR {
   async render(props) {
     return new Promise(async(resolve, reject) => {
       try {
-        const App = require(path.resolve("./", "build", "app", "app.js"));
+        const App = require(path.resolve("./","_gingerjs", "build", "app", "app.js"));
         const StaticRouter = require(path.resolve(
           "./",
+          "_gingerjs",
           "build",
           "app",
           "StaticRouterWrapper.js"
         ));
         const {getAppContext} = require(path.resolve(
           "./",
+          "_gingerjs",
           "build",
           "app",
           "layout.js"
@@ -115,9 +117,10 @@ class SSR {
   async partialRender(props){
     return new Promise((resolve, reject) => {
       // const Component = require(path.resolve("./", "build", "app", "app.js"));
-      const Component = require(path.resolve(this.cwd,"build","app",...props.location.path.split("/"),"index.js"));
+      const Component = require(path.resolve(this.cwd,"_gingerjs","build","app",...props.location.path.split("/"),"index.js"));
       const StaticRouter = require(path.resolve(
         "./",
+        "_gingerjs",
         "build",
         "app",
         "StaticRouterWrapper.js"

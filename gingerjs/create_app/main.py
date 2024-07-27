@@ -11,73 +11,8 @@ from gingerjs.create_app.load_settings import load_settings
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import psutil
-
-def find_process_by_port(port):
-    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-        try:
-            for conn in proc.connections():
-                if conn.laddr.port == port:
-                    return proc
-        except psutil.AccessDenied:
-            continue
-        except psutil.NoSuchProcess:
-            continue
-    return None
-
-def kill_process(process):
-    try:
-        process.terminate()  # or process.kill() for forceful termination
-    except psutil.NoSuchProcess:
-        pass
-
-class ChangeHandler(FileSystemEventHandler):
-    def __init__(self, command,cwd):
-        self.command = command
-        self.process = None
-        self.cwd = cwd
-        self.settings = load_settings()
-        self.my_env = os.environ.copy()  # Copy the current environment
-        for key, value in self.settings.items():
-            self.my_env[key] = str(value)
-        self.my_env["DEBUG"] = str(True)
-        for command in self.command:
-            self.process = subprocess.run(command, shell=True,env=self.my_env)
-    
-    def debug_log(self, *args, **kwargs):
-        if self.my_env["DEBUG"]:
-            print(*args, **kwargs)
-
-    def on_any_event(self, event):
-        # Ignore events in __pycache__ directories
-        if '__pycache__' in event.src_path:
-            return
-        if event.is_directory:
-            return
-        self.debug_log(f"* Detected change in {event.src_path} ,reloading")
-        self.restart()
-
-    def kill(self):
-        if len(self.process):
-            
-            try:
-                process_to_kill = find_process_by_port(self.settings.get("PORT"))
-                if process_to_kill:
-                    self.debug_log(f"Found process {process_to_kill.pid} on port {5001}. Killing...")
-                    kill_process(process_to_kill)
-                    self.debug_log("Process terminated.")
-                else:
-                    self.debug_log(f"No process found on port {self.settings.get('PORT')}.")
-            except Exception as e:
-                self.process.kill()
-
-    def restart(self):
-        self.kill()
-        self.settings = load_settings()
-        self.my_env = os.environ.copy()  # Copy the current environment
-        for key, value in self.settings.items():
-            self.my_env[key] = str(value)
-        self.my_env["DEBUG"] = str(True)
-        self.process = subprocess.Popen(self.command, shell=True,env=self.my_env)
+import importlib.util
+from concurrent.futures import ThreadPoolExecutor
 
 
 class Logger():
@@ -96,12 +31,86 @@ class Logger():
         print(*args, **kwargs)
 
 
-processes = []
 
+
+observer = Observer()
 dir_path = os.path.dirname(os.path.abspath(__file__))
 logger = Logger("create gingerjs")
 
 debug = os.environ.get("debug", "False") == "True" or False
+
+
+def load_module(module_name,module_path):
+    try:
+        module_name = module_name
+        spec = importlib.util.spec_from_file_location(module_name, module_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    except Exception as e:
+        raise e
+
+
+def find_process_by_port(port):
+    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        try:
+            for conn in proc.connections(kind="tcp"):
+                if str(conn.laddr.port) == str(port):
+                    return proc
+        except psutil.AccessDenied:
+            continue
+        except psutil.NoSuchProcess:
+            continue
+    return None
+
+def kill_process(process):
+    try:
+        process.send_signal(signal.SIGTERM)
+    except psutil.NoSuchProcess:
+        pass
+
+def run_command(cmd, env=None, cwd=None):
+    print(f"Running command: {cmd}")
+    process = subprocess.Popen(cmd, shell=True, env=env, cwd=cwd)
+    process.wait()
+
+def task_wrapper(func, name, *args, **kwargs):
+    print(f"Starting task: {name}")
+    return func(*args, **kwargs)
+
+class ChangeHandler(FileSystemEventHandler):
+    def __init__(self, module,func_name,my_env,executor):
+        self.executor = executor
+        self.module = module
+        self.settings = load_settings()
+        self.func_name = func_name
+        self.my_env = my_env
+        for key, value in self.settings.items():
+            self.my_env[key] = str(value)
+        self.executor.submit(task_wrapper, self.restart,"Initial Restart")
+
+    
+    def debug_log(self, *args, **kwargs):
+        if self.my_env["DEBUG"]:
+            print(*args, **kwargs)
+
+    def on_any_event(self, event):
+        # Ignore events in __pycache__ directories
+        if '__pycache__' in event.src_path or ".py" in event.src_path:
+            return
+        if event.is_directory:
+            return
+        self.debug_log(f"* Detected change in {event.src_path} ,reloading")
+        self.restart()
+
+    def restart(self):
+        if hasattr(self.module, self.func_name):
+            to_run = getattr(self.module, self.func_name)
+            to_run()
+            
+        else:
+            raise AttributeError("Module has no attribute "+self.func_name)
+
 
 class Execution_time ():
     def __init__ (self,start_time,name):
@@ -112,20 +121,6 @@ class Execution_time ():
         execution_time = end_time - self.start_time
         print(f"{self.name} Done","Execution Time:", execution_time, "seconds")
 
-
-def signal_handler(sig, frame):
-    print("Ctrl+C captured, killing all processes...")
-    for p in processes:
-        try:
-            p.terminate()
-            print(f"Building on file change stopped")
-        except Exception as e:
-            print(f"Error terminating process {p.pid}: {e}")
-            sys.exit(1)
-    sys.exit(0)
-
-# Register the signal handler
-signal.signal(signal.SIGINT, signal_handler)
 
 # base = os.path.join(os.getcwd(),"example","app")
 base = os.path.join(os.getcwd())
@@ -179,7 +174,7 @@ def babel():
         'babel',
         '--extensions', '.js,.jsx',
         './src',
-        '-d', './build'
+        '-d', './_gingerjs/build'
     ]
     # Execute the command
     result = subprocess.run(command, capture_output=True, text=True,cwd=base)
@@ -232,9 +227,13 @@ def dev_build(mode):
 @cli.command()
 def cra():
     """Creates a react app using src folder"""
-    my_env = os.environ.copy()
-    create_app_process = subprocess.Popen(['python', f"{os.path.join(dir_path,'create_app.py')}"],env=my_env)
-    processes.append(create_app_process)
+    try:
+        module_name = "create_app"
+        module = load_module(module_name,os.path.join(dir_path,"create_app.py"))
+        if hasattr(module, "create_app"):
+            module.create_app()
+    except Exception as e:
+        raise e
         
 
 
@@ -245,19 +244,17 @@ def create_app():
     settings = load_settings()
     cwd = os.path.join(base)
     create_dir(cwd)
-    copy_file_if_not_exists(f"{os.path.dirname(os.path.abspath(__file__))}/app/settings.py",os.path.join(cwd,"settings.py"),shutil.copy) # flask app
+    copy_file_if_not_exists(os.path.join(dir_path,"app","settings.py"),os.path.join(cwd,"settings.py"),shutil.copy) # flask app
     click.echo("Setting up flask app")
-    copy_file_if_not_exists(f"{os.path.dirname(os.path.abspath(__file__))}/app/main.py",os.path.join(cwd,"main.py"),shutil.copy) # flask app
     click.echo("flask app set complete")
     click.echo("Setting up app")
-    copy_file_if_not_exists(f"{os.path.dirname(os.path.abspath(__file__))}/app/package.json",os.path.join(cwd,"package.json"),shutil.copy)
-    copy_file_if_not_exists(f"{os.path.dirname(os.path.abspath(__file__))}/app/postcss.config.js",os.path.join(cwd,"postcss.config.js"),shutil.copy)
-    copy_file_if_not_exists(f"{os.path.dirname(os.path.abspath(__file__))}/app/webpack.config.js",os.path.join(cwd,"webpack.config.js"),shutil.copy)
-    copy_file_if_not_exists(f"{os.path.dirname(os.path.abspath(__file__))}/app/tailwind.config.js",os.path.join(cwd,"tailwind.config.js"),shutil.copy)
-    copy_file_if_not_exists(f"{os.path.dirname(os.path.abspath(__file__))}/app/jsconfig.json",os.path.join(cwd,"jsconfig.json"),shutil.copy)
-    copy_file_if_not_exists(f"{os.path.dirname(os.path.abspath(__file__))}/app/components.json",os.path.join(cwd,"components.json"),shutil.copy)
-    copy_file_if_not_exists(f"{os.path.dirname(os.path.abspath(__file__))}/app/public/",f"{cwd}/public/", shutil.copytree)
-    copy_file_if_not_exists(f"{os.path.dirname(os.path.abspath(__file__))}/app/src/",f"{cwd}/src/", shutil.copytree)
+    copy_file_if_not_exists(os.path.join(dir_path,"app","package.json"),os.path.join(cwd,"package.json"),shutil.copy)
+    copy_file_if_not_exists(os.path.join(dir_path,"app","postcss.config.js"),os.path.join(cwd,"postcss.config.js"),shutil.copy)
+    copy_file_if_not_exists(os.path.join(dir_path,"app","tailwind.config.js"),os.path.join(cwd,"tailwind.config.js"),shutil.copy)
+    copy_file_if_not_exists(os.path.join(dir_path,"app","jsconfig.json"),os.path.join(cwd,"jsconfig.json"),shutil.copy)
+    copy_file_if_not_exists(os.path.join(dir_path,"app","components.json"),os.path.join(cwd,"components.json"),shutil.copy)
+    copy_file_if_not_exists(os.path.join(dir_path,"app","public"),os.path.join(cwd,"public"),shutil.copytree)
+    copy_file_if_not_exists(os.path.join(dir_path,"app","src"),os.path.join(cwd,"src"),shutil.copytree)
     create_dir(os.path.join(cwd,"public","static"))
     create_dir(os.path.join(cwd,"app","src","components"))
     click.echo("App set up completed")
@@ -277,38 +274,53 @@ def runserver(mode):
         settings = load_settings()
         my_env = os.environ.copy()  # Copy the current environment
         if mode == "dev":
+            settings["DEBUG"] = True
+            for key, value in settings.items():
+                my_env[key] = str(value)
             click.echo("Building app in in watch mode")
-            path = "./src"
-            command = " ".join(["gingerjs","build","&&","uvicorn","main:app","--port",settings.get("PORT"),"--host",settings.get("HOST")])
-            event_handler = ChangeHandler(command,base)
-            observer = Observer()
-            observer.schedule(event_handler, path, recursive=True)
-            observer.start()
             try:
-                while True:
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                observer.kill()
-                observer.stop()
-            observer.join()
+                module_name = "create_app"
+                module = load_module(module_name,os.path.join(dir_path,"create_app.py"))
+                path = f".{os.path.sep}src"
+
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    event_handler = ChangeHandler(module, "create_app", my_env, executor)
+                    observer = Observer()
+
+                    def start_observer():
+                        observer.start()
+                        observer.join()
+
+                    observer.schedule(event_handler, path, recursive=True)
+                    executor.submit(task_wrapper, start_observer,"File System Observer")
+                    executor.submit(task_wrapper, run_command, "Run Uvicorn"," ".join(["uvicorn","_gingerjs.main:app","--reload","--port",settings.get("PORT"),"--host",settings.get("HOST")]), my_env, base)
+                    # Keep the main thread alive to let the executor complete its tasks
+                    try:
+                        while True:
+                            pass
+                    except KeyboardInterrupt:
+                        observer.stop()
+                        executor.shutdown(wait=True)
+
+            except  Exception as e:
+                raise e
             return
         
+        settings["DEBUG"] = False
         my_env["GINGERJS_APP_DIR"] = base
         for key, value in settings.items():
             my_env[key] = str(value)
 
-        build_node_process = None
-        node_process = None
         try:
-            build_node_process = subprocess.run(["gingerjs","build"], check=True,cwd=base,env=my_env)
-            node_process = subprocess.run(["uvicorn","main:app","--port",settings.get("PORT"),"--host",settings.get("HOST")], check=True, cwd=base,env=my_env)
+            module_name = "create_app"
+            module = load_module(module_name,os.path.join(dir_path,"create_app.py"))
+            if hasattr(module, "create_app"):
+                module.create_app()
+            subprocess.run([f"uvicorn","_gingerjs.main:app","--port",settings.get("PORT"),"--host",settings.get("HOST")], check=True, cwd=base,env=my_env)
         except  Exception as e:
-            if build_node_process is not None:
-                build_node_process.kill()
-            if node_process is not None:
-                node_process.kill()
+            raise e
 
-    except subprocess.CalledProcessError as e:
+    except Exception as e:
         click.echo(f"Error: {e}", err=True)
 
 if __name__ == '__main__':

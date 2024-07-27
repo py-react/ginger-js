@@ -27,7 +27,7 @@ class JSBridge:
         self.debug = kwargs.get("debug",False)
         dir_path = os.path.dirname(os.path.abspath(__file__))
         # Define the socket path
-        socket_path = os.path.join(os.getcwd(), f"unix.sock")
+        socket_path = os.path.join(os.getcwd(),"_gingerjs", f"unix.sock")
         # socket_path = os.path.join(dir_path, f"unix_{os.getpid()if os.environ.get('DEBUG','False')=='False'else'dev'}.sock")
         # Start the Node.js server as a subprocess
         node_process_path = os.path.join(dir_path, "unix_sock.js")
