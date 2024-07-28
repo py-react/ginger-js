@@ -310,42 +310,8 @@ def create_react_app_with_routes(paths, debug):
             return <Outlet/>
         }})
 
-        const DefaultLoader_ = React.memo(()=>{{
-            return <div
-                style={{{{
-                    height: "100vh",
-                    display: 'flex',
-                    width: '100%',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    gap: '1rem',
-                }}}}
-              >
-                <div style={{{{
-                    backgroundColor: 'gray',
-                    width: '20px',
-                    height: '20px',
-                    borderRadius: '0.375rem',
-                    animation: 'bounce 1s ease-in-out 0s infinite'
-                }}}} />
-                <div style={{{{
-                    backgroundColor: 'gray',
-                    width: '20px',
-                    height: '20px',
-                    borderRadius: '0.375rem',
-                    animation: 'bounce 1s ease-in-out 0.2s infinite'
-                }}}} />
-                <div style={{{{
-                    backgroundColor: 'gray',
-                    width: '20px',
-                    height: '20px',
-                    borderRadius: '0.375rem',
-                    animation: 'bounce 1s ease-in-out 0.4s infinite'
-                }}}} />
-              </div>
-        }})
 
-        const _ProgressBar = ({{isLoading}}) => {{
+        const DefaultLoader_ = ({{isLoading}}) => {{
             const [progress, setProgress] = useState(0);
             const [loading, setLoading] = useState(isLoading);
             useEffect(() => {{
@@ -373,10 +339,12 @@ def create_react_app_with_routes(paths, debug):
             }}, [isLoading]);
 
             if (!loading) return null;
-
             return (
                 <div className="backdrop">
                     <div className="progress-bar" style={{{{ width: `${{progress}}%` }}}}></div>
+                    <noscript>
+                        <div style={{{{color:"#fff"}}}}>Your browser does not support JavaScript!</div>
+                    </noscript>
                 </div>
             );
         }};
@@ -386,7 +354,7 @@ def create_react_app_with_routes(paths, debug):
             const location = useLocation()
             const [loading,setLoading] = useState(true)
 
-            const [propsData,setPropData] = useState((()=>{{
+            const [propsData,setPropData] = useState(()=>(()=>{{
                 try {{
                     const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
                     return data
@@ -408,9 +376,9 @@ def create_react_app_with_routes(paths, debug):
             }},[location])
             
             return (
-                <React.Suspense fallback={{<_ProgressBar isLoading={{loading}} />}}>
+                <React.Suspense fallback={{<Fallback isLoading={{true}} />}}>
                     <Element {{...propsData}} />
-                    <_ProgressBar isLoading={{loading}} />
+                    <Fallback isLoading={{loading}} />
                 </React.Suspense >
             )
         }}
