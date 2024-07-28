@@ -6,6 +6,14 @@ import shutil
 import importlib.util
 
 
+# Function to copy files and directories only if they don't exist at the destination
+def copy_if_not_exists(src, dest):
+    if not os.path.exists(dest):
+        if os.path.isdir(src):
+            shutil.copytree(src, dest)
+        else:
+            shutil.copy2(src, dest)
+
 def load_module(module_name,module_path):
     try:
         module_name = module_name
@@ -627,6 +635,37 @@ def generate_static_router_wrapper():
     export default Router
     '''
 
+def build_changes(path):
+    settings = load_settings()
+    package_manager = settings.get('PACKAGE_MANAGER')
+    my_env = os.environ.copy()
+    debug = settings.get("DEBUG") or False
+    if not debug:
+        assert "Debug mode is not activated"
+    cwd = os.getcwd()
+    destination = path.replace(os.path.sep.join(["","src",""]),os.sep.join(["","_gingerjs","build",""]))
+        
+    # Construct the source and destination paths
+    source_path = os.path.join(base, 'public', 'static')
+    destination_path = os.path.join(base, '_gingerjs', 'build', 'static')
+    # Iterate through the source directory
+    for root, dirs, files in os.walk(source_path):
+        for name in dirs:
+            src_dir = os.path.join(root, name)
+            dest_dir = os.path.join(destination_path, os.path.relpath(src_dir, source_path))
+            copy_if_not_exists(src_dir, dest_dir)
+        for name in files:
+            src_file = os.path.join(root, name)
+            dest_file = os.path.join(destination_path, os.path.relpath(src_file, source_path))
+            copy_if_not_exists(src_file, dest_file)
+
+    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "babel", "--extensions", ".js,.jsx", path, "-d", os.path.dirname(destination)], cwd=base,check=True,env=my_env)
+    print("Building app...")
+    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "webpack","--config",os.path.dirname(__file__)+os.sep+"webpack.config.js", "--stats-error-details"], cwd=base, check=True, env=my_env)
+    os.remove(os.path.join(cwd,"_gingerjs","__init__.py"))
+    with open(os.path.join(cwd,"_gingerjs","__init__.py"), 'w') as file:
+            pass  # 'pass' is used here to do nothing, effectively creating an empty file
+
 def create_app():
     settings = load_settings()
     package_manager = settings.get('PACKAGE_MANAGER')
@@ -681,8 +720,8 @@ def create_app():
     subprocess.run(["yarn" if package_manager == "yarn" else "npx", "babel", "--extensions", ".js,.jsx", os.path.sep.join([".","","_gingerjs","__build__"]), "-d", os.path.sep.join([".","","_gingerjs","build","app"])], cwd=base,check=True,env=my_env)
     if not debug:
         subprocess.run(["rm", "-rf", os.path.sep.join([".","","_gingerjs","__build__"])], check=True, cwd=cwd)
-    module_name = "babel"
-    module = load_module(module_name,os.path.join(dir_path,"main.py"))
+    # module_name = "babel"
+    # module = load_module(module_name,os.path.join(dir_path,"main.py"))
     # if hasattr(module, "babel"):
     #     module.babel()
     babel_command = [
@@ -713,13 +752,7 @@ def create_app():
     source_path = os.path.join(base, 'public', 'static')
     destination_path = os.path.join(base, '_gingerjs', 'build', 'static')
 
-    # Function to copy files and directories only if they don't exist at the destination
-    def copy_if_not_exists(src, dest):
-        if not os.path.exists(dest):
-            if os.path.isdir(src):
-                shutil.copytree(src, dest)
-            else:
-                shutil.copy2(src, dest)
+    
 
     # Iterate through the source directory
     for root, dirs, files in os.walk(source_path):

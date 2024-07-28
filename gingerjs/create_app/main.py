@@ -87,7 +87,6 @@ class ChangeHandler(FileSystemEventHandler):
         self.my_env = my_env
         for key, value in self.settings.items():
             self.my_env[key] = str(value)
-        self.executor.submit(task_wrapper, self.restart,"Initial Restart")
 
     
     def debug_log(self, *args, **kwargs):
@@ -101,12 +100,12 @@ class ChangeHandler(FileSystemEventHandler):
         if event.is_directory:
             return
         self.debug_log(f"* Detected change in {event.src_path} ,reloading")
-        self.restart()
+        self.restart(event.src_path)
 
-    def restart(self):
+    def restart(self,path):
         if hasattr(self.module, self.func_name):
             to_run = getattr(self.module, self.func_name)
-            to_run()
+            to_run(path)
             
         else:
             raise AttributeError("Module has no attribute "+self.func_name)
@@ -284,7 +283,10 @@ def runserver(mode):
                 path = f".{os.path.sep}src"
 
                 with ThreadPoolExecutor(max_workers=2) as executor:
-                    event_handler = ChangeHandler(module, "create_app", my_env, executor)
+                    if hasattr(module,"create_app"):
+                        getattr(module, "create_app")()
+
+                    event_handler = ChangeHandler(module, "build_changes", my_env, executor)
                     observer = Observer()
 
                     def start_observer():
