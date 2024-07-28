@@ -158,35 +158,56 @@ In a Python environment, you can fetch data, interact with the database, and pas
 
 ### Convention
 
-The server logic is placed alongside `index.jsx` or `layout.jsx` within the same folder and is named `index.py`.
+The server logic is placed alongside `index.jsx` and `layout.jsx` within the same folder and is named `index.py`.
 
 ### Example
 #### Server Example
-Path Example : src/app/products/[productId]/index.py
+Path Example : `src/app/index.py`
 ```python
 import requests
 
-def index(request,productId):
-    api_url = f'https://dummyjson.com/products/{productId}'  # Replace this with the URL of the API you want to fetch data from
+def index(request):
+    api_url = f'https://dummyjson.com/products/'  # Replace this with the URL of the API you want to fetch data from
     # ----or---
     # productId = request.args.get("productId")
-    # api_url = f'https://dummyjson.com/products/{productId}
+    # api_url = f'https://dummyjson.com/products/
+    
     response = requests.get(api_url)
 
     if response.status_code == 200:
         data = response.json()
-        return {"product":data}
-    return {"product":{"error":{"message":"Something went wrong! Please try again"}}}
+        return {"products":{data}}
+    return {"products":{"data": None,"error":{"message":"Something went wrong! Please try again"}}}
 
 ```
+
+#### Component Example
+Path Example : src/app/products/[productId]/index.jsx
+```jsx
+import React, { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+
+function Products({products}) {
+  return (
+    <>
+      {JSON.stringify(products,null,4)}
+    </>
+  );
+}
+
+export default Products;
+```
+
 #### layout server Example
-Path Example : src/app/layout.py (will be visible to all subroute)
+If you want to pass props to layout you just have to define a layout in your `index.py`
+
+Path Example : `src/app/index.py`
 ```python
 
 def layout(request):
-    return {"isDev":"true"}
-
+    return {"serverData":"some_data"}
 ```
+
 
 #### layout client Example
 Path Example : src/app/layout.jsx (will be visible to all subroute)
@@ -206,7 +227,10 @@ export default Layout;
 ```
 
 #### Middleware Example
-Path Example : src/app/products/[productId]/middleware.py
+
+Or you want attach a middleware, Just define a middleware in `index.py`
+
+Path Example : `src/app/index.py`
 ```python
 def middleware(request,abort):
     token = request.headers.get('X-Auth-Token')
@@ -216,32 +240,15 @@ def middleware(request,abort):
 
 ```
 
-#### Component Example
-Path Example : src/app/products/[productId]/index.jsx
-```jsx
-import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-
-function Products({product}) {
-  return (
-    <>
-      {JSON.stringify(product)}
-    </>
-  );
-}
-
-export default Products;
-
-```
 #### Api Example
-Path Example : src/app/api/product/[id]index.py
+Path Example : `src/app/api/product/index.py`
 ```python
 
-def index(request,id):
+def index(request):
     data = {}
     for key,value in request.args.items():
         data[key] = value
-    return {"query":data,"id":id}
+    return {"query":data}
 
 ```
 
