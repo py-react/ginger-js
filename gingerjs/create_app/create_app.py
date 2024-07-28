@@ -644,7 +644,10 @@ def build_changes(path):
         assert "Debug mode is not activated"
     cwd = os.getcwd()
     destination = path.replace(os.path.sep.join(["","src",""]),os.sep.join(["","_gingerjs","build",""]))
-        
+
+    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "babel", "--extensions", ".js,.jsx", path, "-d", os.path.dirname(destination)], cwd=base,check=True,env=my_env)
+    print("Building app...")
+    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "webpack","--config",os.path.dirname(__file__)+os.sep+"webpack.config.js", "--stats-error-details"], cwd=base, check=True, env=my_env)
     # Construct the source and destination paths
     source_path = os.path.join(base, 'public', 'static')
     destination_path = os.path.join(base, '_gingerjs', 'build', 'static')
@@ -658,13 +661,10 @@ def build_changes(path):
             src_file = os.path.join(root, name)
             dest_file = os.path.join(destination_path, os.path.relpath(src_file, source_path))
             copy_if_not_exists(src_file, dest_file)
-
-    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "babel", "--extensions", ".js,.jsx", path, "-d", os.path.dirname(destination)], cwd=base,check=True,env=my_env)
-    print("Building app...")
-    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "webpack","--config",os.path.dirname(__file__)+os.sep+"webpack.config.js", "--stats-error-details"], cwd=base, check=True, env=my_env)
     os.remove(os.path.join(cwd,"_gingerjs","__init__.py"))
     with open(os.path.join(cwd,"_gingerjs","__init__.py"), 'w') as file:
             pass  # 'pass' is used here to do nothing, effectively creating an empty file
+    
 
 def create_app():
     settings = load_settings()
