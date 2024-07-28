@@ -118,7 +118,7 @@ When you don't know the exact segment names ahead of time and want to create rou
 A Dynamic Segment can be created by wrapping a folder's name in square brackets: [folderName]. For example, [id] or [slug].
 
 You can use useParam hook to get the values in component/pages
-For ecample if your folder structure looks like src/app/products/[productId]/index.jsx
+For ecample if your folder structure looks like `src/app/products/[productId]/index.jsx`
 ```jsx
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -254,8 +254,30 @@ def GET(request):
 
 Enjoy your full-stack development experience with Python and React!
 
+#### Using styled-components
+Inside your root `layout.jsx` define getAppContext function
+
+```jsx
+import { ServerStyleSheet } from 'styled-components';
+
+async getAppContext = (ctx)=>{
+  const sheet = new ServerStyleSheet();
+  ctx.renderApp:()=>({
+    enhanceApp:(App)=>App,
+    getStyles:(App)=>sheet.collectStyles(App),
+    styles:()=>sheet.getStyleTags(),
+    finally:()=>{
+      sheet.seal()
+    }
+  })
+  return ctx
+}
+
+```
+
+
 #### Using Theme
-Inside your root layout.jsx
+Inside your root `layout.jsx`
 
 ```jsx
 import React from "react";
