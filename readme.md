@@ -244,7 +244,7 @@ def middleware(request,abort):
 Path Example : `src/app/api/product/index.py`
 ```python
 
-def index(request):
+def GET(request):
     data = {}
     for key,value in request.args.items():
         data[key] = value
