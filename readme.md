@@ -1,7 +1,6 @@
 <h1 align="center">GingerJs</h1>
 <h2 align="center">
-  Full-Stack Development Experience with Python and React <br/>
-  ✨ 🚀 Because in the Enterprise Jungle, even Node.js is just a frontend for the real backend ✨ 🚀
+  ✨ 🚀 Full-Stack Development Experience with Python and React ✨ 🚀 <br/>
 </h2>
 
 Unlike typical setups where Node.js serves as the backend for frontend applications, this project leverages Python to deliver a comprehensive full-stack solution.
