@@ -22,6 +22,7 @@ setup(
         "fastapi==0.111.1",
         "watchdog==4.0.1",
         "psutil==6.0.0",
+        "inquirer==3.3.0"
     ],
     entry_points={
         'console_scripts': [

@@ -1,0 +1,10 @@
+{% extends "layout.html" %}
+
+{% block content %}
+
+{% autoescape false %}
+<div id="root" >{{react_context|safe}}</div>
+{% endautoescape %}
+
+{% endblock %}
+

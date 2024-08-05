@@ -2,17 +2,22 @@ const fs = require("fs");
 const path = require("path");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
-const { HotModuleReplacementPlugin } = require("webpack");
 
-// react: 'react-dom', 'react-icons', 'react-router'
-// redux: 'redux', 'react-redux', '@reduxjs', 'redux-sentry-middleware', 'addon-redux'
-// phone: 'react-phone-number-input', 'libphonenumber-js', 'country-flag-icons'
-// analytics: '@segment', '@datadog'
-// search: '@findhotel/sapi', 'algoliasearch'
-// experimentation: '@optimizely', 'opticks'
-// intl: ‘@formatjs', 'intl-messageformat'
-// aws: '@aws-amplify', 'aws-amplify', '@aws-sdk', '@aws-crypto'
-// fp: 'ramda/es', 'immer'
+// {
+//   react: "react-dom", "react-icons", "react-router";
+//   redux: "redux",
+//     "react-redux",
+//     "@reduxjs",
+//     "redux-sentry-middleware",
+//     "addon-redux";
+//   phone: "react-phone-number-input", "libphonenumber-js", "country-flag-icons";
+//   analytics: "@segment", "@datadog";
+//   search: "@findhotel/sapi", "algoliasearch";
+//   experimentation: "@optimizely", "opticks";
+//   intl: "@formatjs", "intl-messageformat";
+//   aws: "@aws-amplify", "aws-amplify", "@aws-sdk", "@aws-crypto";
+//   fp: "ramda/es", "immer";
+// }
 
 const getNodeModulesRegExp = (deps) =>
   new RegExp(`[\\/]node_modules[\\/]${deps.join("|")}`);
@@ -212,8 +217,12 @@ const splitChunks = {
 };
 
 let entry = [path.resolve(process.cwd(), "_gingerjs","build", "app", "main.js")];
-
+const STATIC_SITE = process.env.STATIC_SITE === "True"?true:false;
+const TYPESCRIPT = process.env.TYPESCRIPT === "True"?true:false;
 const MODE = process.env.DEBUG==="True"?"development":"production";
+const MAIN_HTML = STATIC_SITE?"index.html": "layout.html"
+const TAILWIND = process.env.TAILWIND === "True"?true:false;
+const static_path =  "/static"
 
 if (fs.existsSync(path.resolve(process.cwd(), "src", "global.css"))) {
   entry = [
@@ -222,28 +231,84 @@ if (fs.existsSync(path.resolve(process.cwd(), "src", "global.css"))) {
   ];
 }
 
+const rules = (TYPESCRIPT?[
+  {
+    test: /\.((js|jsx|ts|tsx))$/,
+    exclude: /node_modules/,
+    use: [
+      {
+        loader: path.resolve(__dirname, 'svgr-loader.js'),
+      },
+      {
+        loader: "babel-loader",
+        options: {
+          presets: ["@babel/preset-env", "@babel/preset-react"],
+        },
+      },
+    ],
+  },
+  
+  
+]:[
+  {
+    test: /\.((js|jsx))$/,
+    exclude: /node_modules/,
+    use: [
+      {
+        loader: path.resolve(__dirname, 'svgr-loader.js'),
+      },
+      {
+        loader: "babel-loader",
+        options: {
+          presets: ["@babel/preset-env", "@babel/preset-react"],
+        },
+      },
+    ],
+  },
+])
+
 const entry_output = {
+  context: process.cwd(),
   mode: MODE,
   entry: entry,
   output: {
     path: path.resolve(process.cwd(), "_gingerjs", "build", "static"),
     filename:
       MODE === "development"
-        ? path.join("."+path.sep, "js", "[name].[contenthash].js")
+        ? path.join("."+path.sep, "js", "[name].js")
         : path.join("."+path.sep, "js", "[name].[contenthash:8].js"),
     chunkFilename:
       MODE === "development"
-        ? path.join("."+path.sep, "js", "[name].[contenthash].js")
+        ? path.join("."+path.sep, "js", "[name].js")
         : path.join("."+path.sep, "js", "[name].[contenthash:8].js"),
     library: "[name]",
-    publicPath: "/static",
+    publicPath: static_path,
     clean: true,
   },
 };
 
+if(STATIC_SITE){
+  entry_output.devServer= {
+    static: {
+      directory: path.resolve(process.cwd(), "_gingerjs", "build"),
+    },
+    historyApiFallback: true,
+    hot: true,
+    compress: true,
+    port: process.env.PORT||5001,
+    client: {
+      logging: 'info',
+      overlay: {
+        errors:true,
+        runtimeErrors: true,
+      }
+    },
+  }
+}
+
 const config = {
   ...entry_output,
-  devtool: MODE === "development" ? "eval" : false,
+  devtool: MODE === "development" ? "source-map" : false,
   optimization: {
     splitChunks: {
       minSize: 17000,
@@ -258,24 +323,10 @@ const config = {
   },
   module: {
     rules: [
+      ...rules,
       {
-        test: /\.((js|jsx))$/,
-        exclude: /node_modules/,
-        use: [
-          {
-            loader: path.resolve(__dirname, 'svgr-loader.js'),
-          },
-          {
-            loader: "babel-loader",
-            options: {
-              presets: ["@babel/preset-env", "@babel/preset-react"],
-            },
-          },
-        ],
-      },
-      {
-        test: /\.(css|scss|sass)$/i,
-        use: [MiniCssExtractPlugin.loader, "css-loader", "postcss-loader"],
+        test: /\.(css)$/i,
+        use: [MiniCssExtractPlugin.loader, ...(TAILWIND ?["css-loader", "postcss-loader"]:["css-loader"])],
       },
     ],
   },
@@ -283,19 +334,17 @@ const config = {
     // new ChunksWebpackPlugin(),
     new MiniCssExtractPlugin({
       // filename: 'global.css', needs to be relative to output
-      filename: path.join("."+path.sep, "css", "[name].[contenthash].css"),
-      chunkFilename: path.join("."+path.sep, "css", "[id].[contenthash].css"),
+      filename: path.join("."+path.sep, "css", "[name].css"),
+      chunkFilename: path.join("."+path.sep, "css", "[id].css"),
     }),
     new HtmlWebpackPlugin({
-      template: path.join(process.cwd(), "public", "templates", "layout.html"),
-      filename: path.join(".."+path.sep, "templates", "layout.html"),
-      scriptLoading: "defer",
+      template: path.join(process.cwd(), "public", "templates", MAIN_HTML),
+      filename: path.join(".."+path.sep, "templates", MAIN_HTML),
     }),
-    new HotModuleReplacementPlugin()
   ],
 
   resolve: {
-    extensions: [".js", ".jsx"], // Add other extensions as needed
+    extensions: [".js", ".jsx",".ts",".tsx"], // Add other extensions as needed
   },
 };
 

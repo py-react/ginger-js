@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+  server:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - 80:80
+    volumes:
+      - ./_gingerjs/build:/srv
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./_gingerjs/build/templates:/usr/share/nginx/html

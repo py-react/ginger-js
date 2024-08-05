@@ -1,10 +1,11 @@
 import os
 import re
 import subprocess
-from gingerjs.create_app.load_settings import load_settings
 import shutil
 import importlib.util
 
+from gingerjs.create_app.load_settings import load_settings
+settings = load_settings()
 
 # Function to copy files and directories only if they don't exist at the destination
 def copy_if_not_exists(src, dest):
@@ -37,7 +38,7 @@ def copy_file_if_not_exists(src, dst,copyFunc):
 
 class Logger():
     def __init__(self, name):
-        self.settings = load_settings()
+        self.settings = settings
         self.name = name
     
     def debug(self, *args, **kwargs):
@@ -54,18 +55,23 @@ logger = Logger("create-react-app")
 DEFAULT_LAYOUT = "DefaultLayout_"
 PAGE_NOT_FOUND = "GenericNotFound"
 DEFAULT_LOADER = "DefaultLoader_"
-dir_path = os.path.dirname(os.path.abspath(__file__))
 base = os.path.join(os.getcwd())
+dir_path = os.path.dirname(os.path.abspath(__file__))
 
 # Function to recursively search for JSX files and create a list of absolute paths
 def find_jsx_files(directory_path, jsx_files_list=None):
+    
     if jsx_files_list is None:
         jsx_files_list = []
     
     for root, _, files in os.walk(directory_path):
         for file in files:
-            if file.endswith(".jsx"):
-                jsx_files_list.append(os.path.join(root, file))
+            if settings.get("TYPESCRIPT",False):
+                if file.endswith(".tsx"):
+                    jsx_files_list.append(os.path.join(root, file))
+            else:
+                if file.endswith(".jsx"):
+                    jsx_files_list.append(os.path.join(root, file))
     
     return jsx_files_list
 
@@ -79,7 +85,7 @@ def generate_component_name(component_path):
     return replace_wildcards_in_component_name(
         "_".join(
             part.capitalize() for part in component_path.split("/")[3:]
-        ).replace("-", "_").replace(".jsx", "")
+        ).replace("-", "_").replace(".jsx" if not settings.get("TYPESCRIPT",False) else ".tsx", "").replace(".js" if not settings.get("TYPESCRIPT",False) else ".ts", "")
     )
 
 def replace_wildcards(path):
@@ -98,19 +104,25 @@ def create_routes(data, parent_path="/",last_path="",parentLoader="", debug=Fals
     layout_comp = DEFAULT_LAYOUT
     page_not_found = PAGE_NOT_FOUND
 
-    # TODO :get 404 page and other
-    if "layout.jsx" in data:
-        layout_comp = generate_component_name(data["layout.jsx"])
-    elif "layout.jsx" not in data and parent_path == "/":
+    file_ext = ".jsx" if not settings.get("TYPESCRIPT",False) else ".tsx"
+    layout_file = "layout"+file_ext
+    page_not_found_file = "page_not_found"+file_ext
+    loading_file = "loading"+file_ext
+    index_file = "index"+file_ext
+    app_file = "app"+file_ext
+
+    if layout_file in data:
+        layout_comp = generate_component_name(data[layout_file])
+    elif layout_file not in data and parent_path == "/":
         layout_comp = DEFAULT_LAYOUT
 
-    if "page_not_found.jsx" in data:
-        page_not_found = generate_component_name(data["page_not_found.jsx"])
+    if page_not_found_file in data:
+        page_not_found = generate_component_name(data[page_not_found_file])
 
-    if "loading.jsx" in data:
-        loader = generate_component_name(data["loading.jsx"])
+    if loading_file in data:
+        loader = generate_component_name(data[loading_file])
 
-    if "index.jsx" in data:
+    if index_file in data:
         routes.append(f"""
                 <Route path="{replace_wildcards(parent)}" 
                     element = {{
@@ -120,27 +132,22 @@ def create_routes(data, parent_path="/",last_path="",parentLoader="", debug=Fals
                 >
         """)
         for key in data:
-            route_path = data["index.jsx"].split("app")[1].replace("/index.jsx", "")
-            if key not in {"index.jsx", "layout.jsx", "app.jsx", "loading.jsx","page_not_found.jsx"}:
+            route_path = data[index_file].split("app")[1].replace(f"{os.path.sep}{index_file}", "")
+            if key not in {index_file, layout_file, app_file, loading_file,page_not_found_file}:
                 routes.extend(create_routes(data[key], key, full_parent_path,loader, debug))
-            elif key not in {"layout.jsx", "app.jsx", "loading.jsx","page_not_found.jsx"}:
-                component_name = generate_component_name(data["index.jsx"])
+            elif key not in {layout_file, app_file, loading_file,page_not_found_file}:
+                component_name = generate_component_name(data[index_file])
                 add_path = f'path="{replace_wildcards(route_path).replace(f"/{parent}", "")}"'
                 sub_paths = route_path.split("/")
                 routes.append(f'''
                     <Route {"index" if sub_paths[-1] == parent_path or route_path in ["", "/src/"] else add_path}
                         element={{
-                            <>
-                                <PropsProvider Element={{{component_name}}} Fallback={{{loader}}} {{...props}} />
-                            </>
+                            <PropsProvider Element={{{component_name}}} Fallback={{{loader}}} {{...props}} />
                         }}
                     />
                 ''')
         routes.append('</Route>')
-        if page_not_found is not None:
-            routes.append(f'<Route path="*" element={{<{page_not_found} />}}/>')
-        if page_not_found is None and parent == "/":
-            routes.append(f'<Route path="*" element={{<{PAGE_NOT_FOUND} />}}/>') 
+        routes.append(f'<Route path="*" element={{<{page_not_found} />}}/>') 
     return routes
 
 def generic_not_found():
@@ -266,15 +273,16 @@ def generate_debug_error_component():
 
 def generate_import_statements(obj):
     imports = []
-
+    file_ext = ".jsx" if not settings.get("TYPESCRIPT",False) else ".tsx"
+    app_file = "app"+file_ext
     def traverse(node, path):
         nonlocal imports
         if isinstance(node, str):
             component_name = generate_component_name(node)
-            if os.path.sep+"app.jsx" not in node:
-                file_data = open(node, "r").read()
+            if os.path.sep+app_file not in node:
+                # file_data = open(node, "r").read()
                 # if "use client" in file_data:
-                imports.append(f"""const {component_name} = React.lazy(() => import('{node.replace(os.path.sep.join(["","src",""]), os.path.sep.join(["","_gingerjs","build",""])).replace(".jsx", ".js")}'));""")
+                imports.append(f"""const {component_name} = React.lazy(() => import('{node.replace(os.path.sep.join(["","src",""]), os.path.sep.join(["","_gingerjs","build",""])).replace(file_ext, ".js")}'));""")
                 # else:
                 # imports.append(f'import {component_name} from "{node.replace("/src/", "/build/").replace(".jsx", ".js")}";')
 
@@ -325,24 +333,24 @@ def create_react_app_with_routes(paths, debug):
             useEffect(() => {{
                 let interval;
                 if (isLoading) {{
-                setLoading(true);
-                setProgress(0);
-                interval = setInterval(() => {{
-                    setProgress((prev) => {{
-                        if (prev < 90) {{
-                            if(prev+1===100){{
-                                return prev
+                    setLoading(true);
+                    setProgress(0);
+                    interval = setInterval(() => {{
+                        setProgress((prev) => {{
+                            if (prev < 90) {{
+                                if(prev+1===100){{
+                                    return prev
+                                }}
+                                return prev + 0.5; // Adjust the increment as needed for smoother progress
                             }}
-                            return prev + 0.5; // Adjust the increment as needed for smoother progress
-                        }}
-                        return prev;
-                    }});
-                }}, 50); // Adjust the interval duration as needed
+                            return prev;
+                        }});
+                    }}, 50); // Adjust the interval duration as needed
+
                 }} else {{
                     setProgress(100); // complete the progress bar
-                    setTimeout(() => setLoading(false), 500); // wait for the completion transition
+                    setTimeout(() => setLoading(false), 0); // wait for the completion transition
                 }}
-
                 return () => clearInterval(interval);
             }}, [isLoading]);
 
@@ -373,16 +381,14 @@ def create_react_app_with_routes(paths, debug):
 
             useEffect(()=>{{
                 setLoading(true)
-                React.startTransition(() => {{
                     const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
                     setPropData(data)
                     setLoading(false)
-                }});
                 return ()=>{{
                     setLoading(false)
                 }}
             }},[location])
-            
+
             return (
                 <React.Suspense fallback={{<Fallback isLoading={{true}} />}}>
                     <Element {{...propsData}} />
@@ -472,6 +478,7 @@ def create_react_app_with_routes(paths, debug):
     return "\n".join(to_return)
 
 def generate_main_client_entry():
+    static_site = settings.get("STATIC_SITE", False)
     return f'''
     import React,{{useState,useEffect}} from 'react';
     import Router from ".{os.path.sep}BrowserRouterWrapper"
@@ -577,7 +584,17 @@ def generate_main_client_entry():
         if(!container) return
         hydrateRoot(container,<React.StrictMode><Router><App {{...getServerProps({{}})}}/></Router></React.StrictMode>,{{onRecoverableError:handleHydrationError}});
     }}
-    window.__REACT_HYDRATE__()
+    window.__REACT_CREATE_ROOT__ = function(url){{
+        if(!container) return
+        window.flask_react_app_props = {{}}
+        try{{
+            ReactDOM.render(<React.StrictMode><Router><App {{...getServerProps({{}})}}/></Router></React.StrictMode>,container)
+        }}catch(err){{
+            console.log({{err}})
+        }}
+    }}
+
+    {"window.__REACT_CREATE_ROOT__()" if static_site else "window.__REACT_HYDRATE__()"}
 
     // Function to handle navigation events
     function handleNavigation(event) {{
@@ -636,7 +653,6 @@ def generate_static_router_wrapper():
     '''
 
 def build_changes(path):
-    settings = load_settings()
     package_manager = settings.get('PACKAGE_MANAGER')
     my_env = os.environ.copy()
     debug = settings.get("DEBUG") or False
@@ -644,10 +660,7 @@ def build_changes(path):
         assert "Debug mode is not activated"
     cwd = os.getcwd()
     destination = path.replace(os.path.sep.join(["","src",""]),os.sep.join(["","_gingerjs","build",""]))
-
-    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "babel", "--extensions", ".js,.jsx", path, "-d", os.path.dirname(destination)], cwd=base,check=True,env=my_env)
-    print("Building app...")
-    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "webpack","--config",os.path.dirname(__file__)+os.sep+"webpack.config.js", "--stats-error-details"], cwd=base, check=True, env=my_env)
+        
     # Construct the source and destination paths
     source_path = os.path.join(base, 'public', 'static')
     destination_path = os.path.join(base, '_gingerjs', 'build', 'static')
@@ -661,16 +674,21 @@ def build_changes(path):
             src_file = os.path.join(root, name)
             dest_file = os.path.join(destination_path, os.path.relpath(src_file, source_path))
             copy_if_not_exists(src_file, dest_file)
+
+    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "babel", "--extensions", ".js,.jsx,.tsx,.ts", path, "-d", os.path.dirname(destination)], cwd=base,check=True,env=my_env)
+    print("Building app...")
+    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "webpack","--config",os.path.dirname(__file__)+os.sep+"webpack.config.js", "--stats-error-details"], cwd=base, check=True, env=my_env)
     os.remove(os.path.join(cwd,"_gingerjs","__init__.py"))
     with open(os.path.join(cwd,"_gingerjs","__init__.py"), 'w') as file:
             pass  # 'pass' is used here to do nothing, effectively creating an empty file
-    
 
 def create_app():
-    settings = load_settings()
     package_manager = settings.get('PACKAGE_MANAGER')
     my_env = os.environ.copy()
+    for key, value in settings.items():
+        my_env[key] = str(value)
     debug = settings.get("DEBUG") or False
+    my_env["STATIC_SITE"] = str(settings.get("STATIC_SITE",False))
     cwd = os.getcwd()
     if cwd is None:
         raise ValueError("Current working directory not provided")
@@ -717,7 +735,7 @@ def create_app():
     with open(os.path.join(cwd,"_gingerjs", "__build__", "GenericNotFound.jsx"), "w") as file:
         file.write(generic_not_found())
 
-    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "babel", "--extensions", ".js,.jsx", os.path.sep.join([".","","_gingerjs","__build__"]), "-d", os.path.sep.join([".","","_gingerjs","build","app"])], cwd=base,check=True,env=my_env)
+    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "babel", "--extensions", ".js,.jsx,.ts,.tsx", os.path.sep.join([".","","_gingerjs","__build__"]), "-d", os.path.sep.join([".","","_gingerjs","build","app"])], cwd=base,check=True,env=my_env)
     if not debug:
         subprocess.run(["rm", "-rf", os.path.sep.join([".","","_gingerjs","__build__"])], check=True, cwd=cwd)
     # module_name = "babel"
@@ -729,8 +747,6 @@ def create_app():
         'babel',
     ]
     subprocess.run(babel_command, cwd=base, env=my_env)
-    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "webpack","--config",os.path.dirname(__file__)+os.sep+"webpack.config.js", "--stats-error-details"], cwd=base, check=True, env=my_env)
-    
     for dirpath, _, filenames in os.walk(os.path.join(base,"public","templates")):
         for filename in filenames:
             if filename != "layout.html":
@@ -743,16 +759,15 @@ def create_app():
 
                 # Copy the file
                 shutil.copyfile(source_path, destination_path)
-                
 
+    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "webpack","--config",os.path.dirname(__file__)+os.sep+"webpack.config.js", "--stats-error-details"], cwd=base, check=True, env=my_env)
+                
     if not os.path.exists(os.path.join(base,"public","static")):
         os.makedirs(os.path.join(base,"public","static"),exist_ok=True)
 
     # Construct the source and destination paths
     source_path = os.path.join(base, 'public', 'static')
     destination_path = os.path.join(base, '_gingerjs', 'build', 'static')
-
-    
 
     # Iterate through the source directory
     for root, dirs, files in os.walk(source_path):

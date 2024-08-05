@@ -13,6 +13,6 @@ def not_found(bridge,app):
         meta = {
             "title": request.url.path+"?"+request.url.query
         }
-        return app.TemplateResponse(name="not_found.html",request=request,context={"react_context":toRender,"react_props":props,"meta_info":meta,"not_found":True},status_code=404)
+        return app.TemplateResponse(name="content.html",request=request,context={"react_context":toRender,"react_props":props,"meta_info":meta,"not_found":True},status_code=404)
         # return render_template_string(not_found_template,error=True),404
     return view_func
