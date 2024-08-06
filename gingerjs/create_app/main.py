@@ -80,14 +80,16 @@ def task_wrapper(func, name, *args, **kwargs):
     return func(*args, **kwargs)
 
 class ChangeHandler(FileSystemEventHandler):
-    def __init__(self, module,func_name,my_env,executor):
-        self.executor = executor
+    def __init__(self, module,func_name,my_env):
         self.module = module
         self.settings = load_settings()
         self.func_name = func_name
         self.my_env = my_env
+        self.to_run = None
         for key, value in self.settings.items():
             self.my_env[key] = str(value)
+        if hasattr(self.module, self.func_name):
+            self.to_run = getattr(self.module, self.func_name)
 
     
     def debug_log(self, *args, **kwargs):
@@ -106,10 +108,8 @@ class ChangeHandler(FileSystemEventHandler):
         self.restart(event.src_path)
 
     def restart(self,path):
-        if hasattr(self.module, self.func_name):
-            to_run = getattr(self.module, self.func_name)
-            to_run()
-            
+        if self.to_run:
+            self.to_run()
         else:
             raise AttributeError("Module has no attribute "+self.func_name)
 
@@ -280,7 +280,9 @@ def cra():
         
 
 def create_settings_file(config,base):
-    config_content = f"""NAME="{config["project_settings"]['project_name']}"
+    config_content = f"""import os
+
+NAME="{config["project_settings"]['project_name']}"
 VERSION="{config["project_settings"]['version']}"
 PACKAGE_MANAGER="{config["project_settings"]['package_manager']}"
 DEBUG={config["project_settings"]['debug']}
@@ -310,8 +312,8 @@ def create_package_json(config, package_json_path):
     dev_dependencies = package_json.get("devDependencies", {})
     babel = package_json.get("babel",{})
     babel["presets"] = ["@babel/preset-env","@babel/preset-react"]
-    babel["plugin"] = [
-        ["module-reslover",{"root":["./"],"alias":{"@":"./src","src":"./src"}}],
+    babel["plugins"] = [
+        ["module-resolver",{"root":["./"],"alias":{"@":"./src","src":"./src"}}],
         "@babel/plugin-transform-modules-commonjs"
     ]
 
@@ -428,11 +430,12 @@ def create_app():
 def runserver(mode):
     """Runs the webapp"""
     try:
+        my_env = os.environ.copy()  # Copy the current environment
         settings = load_settings()
         if settings.get("STATIC_SITE",False):
-            logger.info("Try gingerjs build as you are building a static site and change debug mode to have dev server")
+            logger.info("This is a dev server, Change DEBUG to False to build production app")
+            subprocess.run(["gingerjs","build"],check=True,env=my_env)
             return
-        my_env = os.environ.copy()  # Copy the current environment
         if mode == "dev":
             settings["DEBUG"] = True
             click.echo("Building app in in watch mode")
@@ -445,7 +448,7 @@ def runserver(mode):
                     if hasattr(module,"create_app"):
                         getattr(module, "create_app")()
 
-                    event_handler = ChangeHandler(module, "create_app", my_env, executor)
+                    event_handler = ChangeHandler(module, "create_app", my_env)
                     observer = Observer()
 
                     def start_observer():
@@ -468,7 +471,6 @@ def runserver(mode):
             return
         
         settings["DEBUG"] = False
-        my_env["GINGERJS_APP_DIR"] = base
 
         try:
             module_name = "create_app"

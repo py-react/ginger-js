@@ -320,7 +320,7 @@ const config = {
     historyApiFallback: true,
     hot: true,
     compress: true,
-    open:false,
+    open:true,
     port: process.env.PORT||5001,
     client: {
       logging: 'info',

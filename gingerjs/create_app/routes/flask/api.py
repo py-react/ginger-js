@@ -1,6 +1,8 @@
 from fastapi import Request
+from functools import wraps
 
 def api(module):
-    async def api_func(request:Request):
-        return await module(request)
+    @wraps(module)
+    async def api_func(*args, **kwargs):
+        return await module(*args, **kwargs)
     return api_func
