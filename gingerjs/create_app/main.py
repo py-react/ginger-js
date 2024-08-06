@@ -96,6 +96,8 @@ class ChangeHandler(FileSystemEventHandler):
 
     def on_any_event(self, event):
         # Ignore events in __pycache__ directories
+        if "_gingerjs" in event.src_path:
+            return
         if '__pycache__' in event.src_path or ".py" in event.src_path:
             return
         if event.is_directory:
@@ -106,7 +108,7 @@ class ChangeHandler(FileSystemEventHandler):
     def restart(self,path):
         if hasattr(self.module, self.func_name):
             to_run = getattr(self.module, self.func_name)
-            to_run(path)
+            to_run()
             
         else:
             raise AttributeError("Module has no attribute "+self.func_name)
@@ -306,11 +308,18 @@ def create_package_json(config, package_json_path):
     # Define dependencies based on user input
     dependencies = package_json.get("dependencies", {})
     dev_dependencies = package_json.get("devDependencies", {})
+    babel = package_json.get("babel",{})
+    babel["presets"] = ["@babel/preset-env","@babel/preset-react"]
+    babel["plugin"] = [
+        ["module-reslover",{"root":["./"],"alias":{"@":"./src","src":"./src"}}],
+        "@babel/plugin-transform-modules-commonjs"
+    ]
 
     # Add or remove ShadCN dependency
     if config["create_app_settings"]["use_typescript"]:
         dev_dependencies["ts-loader"] = "^9.5.1"
         dev_dependencies["@babel/preset-typescript"] = "^7.24.7"
+        babel["presets"].insert(1,"@babel/typescript")
     else:
         dev_dependencies.pop("ts-loader", None)
         dev_dependencies.pop("@babel/preset-typescript", None)
@@ -357,6 +366,9 @@ def create_package_json(config, package_json_path):
     # Update package.json
     package_json["dependencies"] = dependencies
     package_json["devDependencies"] = dev_dependencies
+
+    if not config["project_settings"]["static_site"]:
+        package_json["babel"] = babel
 
     with open(os.path.join(base,"package.json"), "w") as file:
         json.dump(package_json, file, indent=2)
@@ -433,7 +445,7 @@ def runserver(mode):
                     if hasattr(module,"create_app"):
                         getattr(module, "create_app")()
 
-                    event_handler = ChangeHandler(module, "build_changes", my_env, executor)
+                    event_handler = ChangeHandler(module, "create_app", my_env, executor)
                     observer = Observer()
 
                     def start_observer():

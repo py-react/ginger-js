@@ -212,7 +212,6 @@ const splitChunks = {
 };
 
 
-
 const entry = [
   path.resolve(process.cwd(), "_gingerjs","__build__", "main.jsx"),
 ];
@@ -227,6 +226,7 @@ if (fs.existsSync(path.resolve(process.cwd(), "src", "global.css"))) {
   entry.push(path.resolve(process.cwd(), "src", "global.css"))
 }
 
+
 const babelConfig = {
   test:/\.((js|jsx))$/,
   babelPreset:[['@babel/preset-env', { targets: "defaults" }]]
@@ -236,6 +236,7 @@ if(TYPESCRIPT){
   babelConfig.test = /\.((js|jsx|ts|tsx))$/
   babelConfig.babelPreset.push("@babel/typescript")
 }
+
 babelConfig.babelPreset.push("@babel/preset-react")
 
 

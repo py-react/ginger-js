@@ -275,6 +275,8 @@ def generate_import_statements(obj):
     imports = []
     file_ext = ".jsx" if not settings.get("TYPESCRIPT",False) else ".tsx"
     app_file = "app"+file_ext
+    replace_src_part = os.path.sep.join(["","src",""]) if settings.get("STATIC_SITE",False)  else  os.path.sep.join(["","_gingerjs","build",""])
+    replace_ext_part = file_ext.replace("j","t") if settings.get("STATIC_SITE",False) else ".js"
     def traverse(node, path):
         nonlocal imports
         if isinstance(node, str):
@@ -282,7 +284,7 @@ def generate_import_statements(obj):
             if os.path.sep+app_file not in node:
                 # file_data = open(node, "r").read()
                 # if "use client" in file_data:
-                imports.append(f"""const {component_name} = React.lazy(() => import('{node.replace(os.path.sep.join(["","src",""]), os.path.sep.join(["","src",""])).replace(file_ext, file_ext.replace("j","t") if settings.get("TYPESCRIPT",False)else file_ext)}'));""")
+                imports.append(f"""const {component_name} = React.lazy(() => import('{node.replace(os.path.sep.join(["","src",""]), replace_src_part).replace(file_ext, replace_ext_part if settings.get("TYPESCRIPT",False) else ".js" if not settings.get("STATIC_SITE",False) else file_ext)}'));""")
                 # else:
                 # imports.append(f'import {component_name} from "{node.replace("/src/", "/build/").replace(".jsx", ".js")}";')
 
@@ -755,7 +757,8 @@ def inital_setup_before_babel():
     with open(os.path.join(cwd,"_gingerjs", "__build__", "GenericNotFound.jsx"), "w") as file:
         file.write(generic_not_found())
 
-    # subprocess.run(["yarn" if package_manager == "yarn" else "npx", "babel", "--extensions", ".js,.jsx,.ts,.tsx", os.path.sep.join([".","","_gingerjs","__build__"]), "-d", os.path.sep.join([".","","_gingerjs","build","app"])], cwd=base,check=True,env=my_env)
+    if not settings.get("STATIC_SITE",False):
+        subprocess.run(["yarn" if package_manager == "yarn" else "npx", "babel", "--extensions", ".js,.jsx,.ts,.tsx", os.path.sep.join([".","","_gingerjs","__build__"]), "-d", os.path.sep.join([".","","_gingerjs","build","app"])], cwd=base,check=True,env=my_env)
     
 
 
@@ -771,13 +774,13 @@ def create_app():
         raise ValueError("Current working directory not provided")
 
     inital_setup_before_babel()
-    babel_command = [
-        'gingerjs',
-        'babel',
-    ]
-
-    # subprocess.run(babel_command, cwd=base, env=my_env)
     if (not settings.get("STATIC_SITE",False)):
+        babel_command = [
+            'gingerjs',
+            'babel',
+        ]
+
+        subprocess.run(babel_command, cwd=base, env=my_env)
         for dirpath, _, filenames in os.walk(os.path.join(base,"public","templates")):
             for filename in filenames:
                 if filename != "layout.html" and filename!="index.html" and filename!="static_site.html":

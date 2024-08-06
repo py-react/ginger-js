@@ -114,7 +114,7 @@ def main():
         "port": "5001",
         "host": "0.0.0.0",
         "PYTHONDONTWRITEBYTECODE": "",
-        "CWD": "__file__",
+        "CWD": "os.path.dirname(os.path.abspath(__file__))",
         "static_site": use_static_site,
         "use_typescript":use_typescript
     }
