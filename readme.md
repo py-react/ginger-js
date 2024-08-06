@@ -5,6 +5,8 @@
 
 Unlike typical setups where Node.js serves as the backend for frontend applications, this project leverages Python to deliver a comprehensive full-stack solution.
 
+`Note: The GingerJs meta-framework is currently under development. As such, features and specifications are subject to change as we refine and enhance the framework`
+
 ### Install GingerJS
 
 #### Python Environment and Requirements
