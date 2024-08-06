@@ -1,11 +1,12 @@
-async def GET(request):
+from fastapi import Request
+async def GET(request:Request):
     return {"user":"1"}
 
-async def POST(request):
+async def POST(request:Request):
     return {"message":"done"}
 
-async def PUT(request):
+async def PUT(request:Request):
     return {"message":"done"}
 
-async def DELETE(request):
+async def DELETE(request:Request):
     return {"message":"done"}
