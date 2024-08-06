@@ -50,9 +50,9 @@ gingerjs runserver
 
 
 The application will run on port 5001 by default.
-If 5001 is already in use, You can change the default port by adding port in main.py 
+If 5001 is already in use, You can change the default port by adding port in `settings.py`
 ```python
-app.run_app(debug=True, host="0.0.0.0", port=<PORT>)
+PORT=3000
 ```
 
 ## Main Features
@@ -163,9 +163,10 @@ The server logic is placed alongside `index.jsx` and `layout.jsx` within the sam
 #### Server Example
 Path Example : `src/app/index.py`
 ```python
+from fastapi import Request
 import requests
 
-def index(request):
+def index(request:Request):
     api_url = f'https://dummyjson.com/products/'  # Replace this with the URL of the API you want to fetch data from
     # ----or---
     # productId = request.args.get("productId")
@@ -202,8 +203,9 @@ If you want to pass props to layout you just have to define a layout in your `in
 
 Path Example : `src/app/index.py`
 ```python
+from fastapi import Request
 
-def layout(request):
+def layout(request:Request):
     return {"serverData":"some_data"}
 ```
 
@@ -231,23 +233,33 @@ Or you want attach a middleware, Just define a middleware in `index.py`
 
 Path Example : `src/app/index.py`
 ```python
-def middleware(request,abort):
+from fastapi import Request
+
+async def middleware(request:Request,call_next):
     token = request.headers.get('X-Auth-Token')
     if token != 'secret-token':
-      return abort(401,{"error":"No Auth"})
-    return
+      # raise 403
+    return call_next(request)
 
 ```
 
-#### Api Example
+#### Api and middleware example 
 Path Example : `src/app/api/product/index.py`
 ```python
+from fastapi import Request
 
-def GET(request):
+def GET(request:Request):
     data = {}
     for key,value in request.args.items():
         data[key] = value
     return {"query":data}
+  
+
+async def middleware(request:Request,call_next):
+    token = request.headers.get('X-Auth-Token')
+    if token != 'secret-token':
+      # raise 403
+    return call_next(request)
 
 ```
 
