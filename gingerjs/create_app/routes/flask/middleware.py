@@ -6,20 +6,28 @@ from fastapi import Request,FastAPI
 
 def match_static_to_dynamic(static_path, dynamic_path_pattern):
     """
-    Checks if the static_path matches the dynamic_path_pattern.
+    Checks if the static_path matches the dynamic_path_pattern, including wildcard segments.
 
     Args:
         static_path (str): The static path to check.
-        dynamic_path_pattern (str): The dynamic path pattern with placeholders (e.g., /api/test/{testId}).
+        dynamic_path_pattern (str): The dynamic path pattern with placeholders and wildcards (e.g., /api/test/{testId}/).
 
     Returns:
         bool: True if the static path matches the dynamic path pattern, otherwise False.
     """
     # Convert dynamic path pattern to regex
-    # Example: /api/test/{testId} => ^/api/test/(?P<testId>[^/]+)$
+    # Example: /api/test/{testId}/ => ^/api/test/[^/]+(/.*)?$
     pattern = dynamic_path_pattern
-    pattern = re.sub(r'\{(\w+)\}', r'[^/]+', pattern)  # Replace {param} with a regex for non-slash characters
-    pattern = '^' + pattern + '$'  # Anchor pattern to match the entire path
+
+    # Replace {param} with a regex for non-slash characters
+    pattern = re.sub(r'\{(\w+)\}', r'[^/]+', pattern)
+
+    # Ensure that the pattern matches subroutes
+    if pattern.endswith('/'):
+        pattern = pattern + '.*'
+
+    # Anchor pattern to match the entire path
+    pattern = '^' + pattern + '$'
 
     # Match static path against the regex pattern
     return re.fullmatch(pattern, static_path) is not None

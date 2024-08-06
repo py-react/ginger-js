@@ -66,15 +66,14 @@ def define_routes(app:FastAPI,root_folder,route_type,bridge,*args, **kwargs):
                             dependencies = []
                             if hasattr(module, 'middleware'):
                                 # dependencies.append(Depends(module.middleware))
-                                api_middleware_class =  Create_Middleware_Class(module.middleware,f"/api{url_rule}","api")
+                                api_middleware_class =  Create_Middleware_Class(module.middleware,f"/api{url_rule}/","api")
                                 app.add_middleware(api_middleware_class)
-                                routes_tree.append(f"Middleware attached on api '/api{url_rule}' attached it using middleware.py in {dirpath}")
+                                routes_tree.append(f"Middleware attached on api '/api{url_rule}/' attached it using middleware.py in {dirpath}")
 
                             methods = ["GET","POST","PUT","DELETE"]
 
                             for method in methods:
                                 if hasattr(module, method):
-                                    expectedParams = re.findall(r'\{(.*?)\}', f"/api{url_rule}")
                                     route = APIRoute(
                                         path=f"/api{url_rule}",
                                         endpoint=api(getattr(module, method)),
@@ -87,13 +86,13 @@ def define_routes(app:FastAPI,root_folder,route_type,bridge,*args, **kwargs):
                             routes_tree.append(f"API route '/api{url_rule}' attached it using index.py in {dirpath}")
                         elif route_type == "view":
                             if hasattr(module, 'layout'):
-                                layout_middleware_class =  Create_Layout_Middleware_Class(module.layout,url_rule)
+                                layout_middleware_class =  Create_Layout_Middleware_Class(module.layout,f"{url_rule}/")
                                 app.add_middleware(layout_middleware_class)
                                 routes_tree.append(f"layout attached on route '{url_rule}' attached it using layout.py in {dirpath}")
                             if hasattr(module, 'middleware'):
-                                view_middleware_class =  Create_Middleware_Class(module.middleware,url_rule,"view")
+                                view_middleware_class =  Create_Middleware_Class(module.middleware,f"{url_rule}/","view")
                                 app.add_middleware(view_middleware_class)
-                                routes_tree.append(f"Middleware attached on route '{url_rule}' attached it using middleware.py in {dirpath}")
+                                routes_tree.append(f"Middleware attached on route '{url_rule}/' attached it using middleware.py in {dirpath}")
                             if hasattr(module, 'index'):
                                 routes_tree.append(f"Route '{url_rule}' attached it using index.py in {dirpath}")
                                 route =APIRoute(
