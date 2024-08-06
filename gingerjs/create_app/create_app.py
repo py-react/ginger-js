@@ -282,7 +282,7 @@ def generate_import_statements(obj):
             if os.path.sep+app_file not in node:
                 # file_data = open(node, "r").read()
                 # if "use client" in file_data:
-                imports.append(f"""const {component_name} = React.lazy(() => import('{node.replace(os.path.sep.join(["","src",""]), os.path.sep.join(["","_gingerjs","build",""])).replace(file_ext, ".js")}'));""")
+                imports.append(f"""const {component_name} = React.lazy(() => import('{node.replace(os.path.sep.join(["","src",""]), os.path.sep.join(["","src",""])).replace(file_ext, file_ext.replace("j","t") if settings.get("TYPESCRIPT",False)else file_ext)}'));""")
                 # else:
                 # imports.append(f'import {component_name} from "{node.replace("/src/", "/build/").replace(".jsx", ".js")}";')
 
@@ -346,6 +346,7 @@ def create_react_app_with_routes(paths, debug):
                             return prev;
                         }});
                     }}, 50); // Adjust the interval duration as needed
+                    console.log("added interval")
 
                 }} else {{
                     setProgress(100); // complete the progress bar
@@ -682,7 +683,25 @@ def build_changes(path):
     with open(os.path.join(cwd,"_gingerjs","__init__.py"), 'w') as file:
             pass  # 'pass' is used here to do nothing, effectively creating an empty file
 
-def create_app():
+
+def copy_public_static():
+    # Construct the source and destination paths
+    source_path = os.path.join(base, 'public', 'static')
+    destination_path = os.path.join(base, '_gingerjs', 'build', 'static')
+
+    # Iterate through the source directory
+    for root, dirs, files in os.walk(source_path):
+        for name in dirs:
+            src_dir = os.path.join(root, name)
+            dest_dir = os.path.join(destination_path, os.path.relpath(src_dir, source_path))
+            copy_if_not_exists(src_dir, dest_dir)
+        for name in files:
+            src_file = os.path.join(root, name)
+            dest_file = os.path.join(destination_path, os.path.relpath(src_file, source_path))
+            copy_if_not_exists(src_file, dest_file)
+
+
+def inital_setup_before_babel():
     package_manager = settings.get('PACKAGE_MANAGER')
     my_env = os.environ.copy()
     for key, value in settings.items():
@@ -710,9 +729,10 @@ def create_app():
         pass
 
     os.makedirs(os.path.join(cwd,"_gingerjs"), exist_ok=True)
-    copy_file_if_not_exists(os.path.join(dir_path,"app","main.py"),os.path.join(cwd,"_gingerjs","main.py"),shutil.copy) # flask app
-    with open(os.path.join(cwd,"_gingerjs","__init__.py"), 'w') as file:
-        pass  # 'pass' is used here to do nothing, effectively creating an empty file
+    if not settings.get("STATIC_SITE",False):
+        copy_file_if_not_exists(os.path.join(dir_path,"app","main.py"),os.path.join(cwd,"_gingerjs","main.py"),shutil.copy) # flask app
+        with open(os.path.join(cwd,"_gingerjs","__init__.py"), 'w') as file:
+            pass  # 'pass' is used here to do nothing, effectively creating an empty file
 
     os.makedirs(os.path.join(cwd,"_gingerjs","__build__"), exist_ok=True)
 
@@ -735,48 +755,53 @@ def create_app():
     with open(os.path.join(cwd,"_gingerjs", "__build__", "GenericNotFound.jsx"), "w") as file:
         file.write(generic_not_found())
 
-    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "babel", "--extensions", ".js,.jsx,.ts,.tsx", os.path.sep.join([".","","_gingerjs","__build__"]), "-d", os.path.sep.join([".","","_gingerjs","build","app"])], cwd=base,check=True,env=my_env)
-    if not debug:
-        subprocess.run(["rm", "-rf", os.path.sep.join([".","","_gingerjs","__build__"])], check=True, cwd=cwd)
-    # module_name = "babel"
-    # module = load_module(module_name,os.path.join(dir_path,"main.py"))
-    # if hasattr(module, "babel"):
-    #     module.babel()
+    # subprocess.run(["yarn" if package_manager == "yarn" else "npx", "babel", "--extensions", ".js,.jsx,.ts,.tsx", os.path.sep.join([".","","_gingerjs","__build__"]), "-d", os.path.sep.join([".","","_gingerjs","build","app"])], cwd=base,check=True,env=my_env)
+    
+
+
+def create_app():
+    package_manager = settings.get('PACKAGE_MANAGER')
+    my_env = os.environ.copy()
+    for key, value in settings.items():
+        my_env[key] = str(value)
+    debug = settings.get("DEBUG") or False
+    my_env["STATIC_SITE"] = str(settings.get("STATIC_SITE",False))
+    cwd = os.getcwd()
+    if cwd is None:
+        raise ValueError("Current working directory not provided")
+
+    inital_setup_before_babel()
     babel_command = [
         'gingerjs',
         'babel',
     ]
-    subprocess.run(babel_command, cwd=base, env=my_env)
-    for dirpath, _, filenames in os.walk(os.path.join(base,"public","templates")):
-        for filename in filenames:
-            if filename != "layout.html":
-                # Construct the source and destination paths
-                source_path = os.path.join(base, 'public', 'templates', filename)
-                destination_path = os.path.join(base,"_gingerjs", 'build', 'templates', filename)
 
-                # Create the destination directory if it does not exist
-                os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+    # subprocess.run(babel_command, cwd=base, env=my_env)
+    if (not settings.get("STATIC_SITE",False)):
+        for dirpath, _, filenames in os.walk(os.path.join(base,"public","templates")):
+            for filename in filenames:
+                if filename != "layout.html" and filename!="index.html" and filename!="static_site.html":
+                    # Construct the source and destination paths
+                    source_path = os.path.join(base, 'public', 'templates', filename)
+                    destination_path = os.path.join(base,"_gingerjs", 'build', 'templates', filename)
 
-                # Copy the file
-                shutil.copyfile(source_path, destination_path)
+                    # Create the destination directory if it does not exist
+                    os.makedirs(os.path.dirname(destination_path), exist_ok=True)
 
-    subprocess.run(["yarn" if package_manager == "yarn" else "npx", "webpack","--config",os.path.dirname(__file__)+os.sep+"webpack.config.js", "--stats-error-details"], cwd=base, check=True, env=my_env)
+                    # Copy the file
+                    shutil.copyfile(source_path, destination_path)
+
+    if (not settings.get("STATIC_SITE",False)) or (settings.get("STATIC_SITE",False) and not debug):
+        subprocess.run(["yarn" if package_manager == "yarn" else "npx", "webpack","--config",os.path.dirname(__file__)+os.sep+"webpack.config.js", "--progress","--stats-error-details"], cwd=base, check=True, env=my_env)
                 
     if not os.path.exists(os.path.join(base,"public","static")):
         os.makedirs(os.path.join(base,"public","static"),exist_ok=True)
 
-    # Construct the source and destination paths
-    source_path = os.path.join(base, 'public', 'static')
-    destination_path = os.path.join(base, '_gingerjs', 'build', 'static')
-
-    # Iterate through the source directory
-    for root, dirs, files in os.walk(source_path):
-        for name in dirs:
-            src_dir = os.path.join(root, name)
-            dest_dir = os.path.join(destination_path, os.path.relpath(src_dir, source_path))
-            copy_if_not_exists(src_dir, dest_dir)
-        for name in files:
-            src_file = os.path.join(root, name)
-            dest_file = os.path.join(destination_path, os.path.relpath(src_file, source_path))
-            copy_if_not_exists(src_file, dest_file)
+    # copy_public_static()
+    
+    if settings.get("STATIC_SITE",False) and debug:
+        subprocess.run(["yarn" if package_manager == "yarn" else "npx", "webpack","serve","--progress", "--config",os.path.join(os.path.dirname(__file__),"webpack.config.js")], cwd=base, check=True, env=my_env)
+    
+    if not debug:
+        subprocess.run(["rm", "-rf", os.path.sep.join([".","","_gingerjs","__build__"])], check=True, cwd=cwd)
 

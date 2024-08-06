@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
-
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 // {
 //   react: "react-dom", "react-icons", "react-router";
 //   redux: "redux",
@@ -208,67 +208,38 @@ const splitChunks = {
     [cacheGroups.aws.name]: cacheGroups.aws,
     [cacheGroups.fp.name]: cacheGroups.fp,
     vendor: cacheGroups.vendor,
-    default: {
-      minChunks: 2,
-      priority: -20,
-      reuseExistingChunk: true,
-    },
   },
 };
 
-let entry = [path.resolve(process.cwd(), "_gingerjs","build", "app", "main.js")];
+
+
+const entry = [
+  path.resolve(process.cwd(), "_gingerjs","__build__", "main.jsx"),
+];
 const STATIC_SITE = process.env.STATIC_SITE === "True"?true:false;
 const TYPESCRIPT = process.env.TYPESCRIPT === "True"?true:false;
 const MODE = process.env.DEBUG==="True"?"development":"production";
 const MAIN_HTML = STATIC_SITE?"index.html": "layout.html"
 const TAILWIND = process.env.TAILWIND === "True"?true:false;
-const static_path =  "/static"
+const static_path =  "/static/"
 
 if (fs.existsSync(path.resolve(process.cwd(), "src", "global.css"))) {
-  entry = [
-    path.resolve(process.cwd(), "_gingerjs","build", "app", "main.js"),
-    path.resolve(process.cwd(), "src", "global.css"),
-  ];
+  entry.push(path.resolve(process.cwd(), "src", "global.css"))
 }
 
-const rules = (TYPESCRIPT?[
-  {
-    test: /\.((js|jsx|ts|tsx))$/,
-    exclude: /node_modules/,
-    use: [
-      {
-        loader: path.resolve(__dirname, 'svgr-loader.js'),
-      },
-      {
-        loader: "babel-loader",
-        options: {
-          presets: ["@babel/preset-env", "@babel/preset-react"],
-        },
-      },
-    ],
-  },
-  
-  
-]:[
-  {
-    test: /\.((js|jsx))$/,
-    exclude: /node_modules/,
-    use: [
-      {
-        loader: path.resolve(__dirname, 'svgr-loader.js'),
-      },
-      {
-        loader: "babel-loader",
-        options: {
-          presets: ["@babel/preset-env", "@babel/preset-react"],
-        },
-      },
-    ],
-  },
-])
+const babelConfig = {
+  test:/\.((js|jsx))$/,
+  babelPreset:[['@babel/preset-env', { targets: "defaults" }]]
+}
+
+if(TYPESCRIPT){
+  babelConfig.test = /\.((js|jsx|ts|tsx))$/
+  babelConfig.babelPreset.push("@babel/typescript")
+}
+babelConfig.babelPreset.push("@babel/preset-react")
+
 
 const entry_output = {
-  context: process.cwd(),
   mode: MODE,
   entry: entry,
   output: {
@@ -283,32 +254,90 @@ const entry_output = {
         : path.join("."+path.sep, "js", "[name].[contenthash:8].js"),
     library: "[name]",
     publicPath: static_path,
-    clean: true,
+    clean:true
   },
 };
 
-if(STATIC_SITE){
-  entry_output.devServer= {
-    static: {
-      directory: path.resolve(process.cwd(), "_gingerjs", "build"),
+const static_file_path = path.resolve(process.cwd(), 'public', 'static');
+
+const plugins = [
+  // new ChunksWebpackPlugin(),
+  new MiniCssExtractPlugin({
+    // needs to be relative to output
+    filename: path.join(".", "css", "[name].css"),
+    chunkFilename: path.join(".", "css", "[id].css"),
+  }),
+  new HtmlWebpackPlugin({
+    template: path.join(process.cwd(), "public", "templates", MAIN_HTML),
+    // needs to be relative to output
+    filename: STATIC_SITE?MAIN_HTML:path.join("..", "templates", MAIN_HTML)
+  }),
+];
+
+function hasFiles(directory) {
+  const items = fs.readdirSync(directory);
+  for (let item of items) {
+    const fullPath = path.join(directory, item);
+    const stat = fs.statSync(fullPath);
+    if (stat.isFile()) {
+      return true;
+    } else if (stat.isDirectory() && hasFiles(fullPath)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Only add CopyWebpackPlugin if the directory is not empty
+if (fs.existsSync(static_file_path) && hasFiles(static_file_path)) {
+  plugins.push(
+    new CopyWebpackPlugin({
+      patterns: [
+        {
+          from: path.join('public','static'),
+          to: '' // copies all files to dist/assets
+        }
+      ]
+    })
+  );
+}
+
+/**
+ * @type {import('webpack').Configuration}
+ */
+const config = {
+  ...entry_output,
+  devtool: MODE === "development" ? "source-map" : false,
+  ...(STATIC_SITE && {devServer:{
+    devMiddleware:{
+      publicPath: static_path,
+      writeToDisk:true
+    },
+    static:{
+      directory:path.resolve(process.cwd(), "_gingerjs", "build", "static"),
     },
     historyApiFallback: true,
     hot: true,
     compress: true,
+    open:false,
     port: process.env.PORT||5001,
     client: {
       logging: 'info',
       overlay: {
+        warnings:false,
         errors:true,
         runtimeErrors: true,
       }
     },
-  }
-}
-
-const config = {
-  ...entry_output,
-  devtool: MODE === "development" ? "source-map" : false,
+  }}),
+  resolve: {
+    root: path.resolve(process.cwd()),
+    alias: {
+      "@": "./src",
+      "src": "./src"
+    },
+    extensions: ["", ".ts", ".tsx", ".js"]
+  },
   optimization: {
     splitChunks: {
       minSize: 17000,
@@ -323,29 +352,55 @@ const config = {
   },
   module: {
     rules: [
-      ...rules,
+      {
+        test: /\.svg$/,
+        use: ['@svgr/webpack'],
+      },
+      {
+        test: babelConfig.test,
+        exclude: /node_modules/,
+        use: [
+          {
+            loader: "babel-loader",
+            options: {
+              presets: babelConfig.babelPreset,
+              plugins: [
+                [
+                  "module-resolver",
+                  {
+                    "root": [
+                      "./"
+                    ],
+                    "alias": {
+                      "@": "./src",
+                      "src": "./src"
+                    }
+                  }
+                ],
+                "@babel/plugin-transform-modules-commonjs"
+              ]
+            },
+          },
+        ],
+      },
       {
         test: /\.(css)$/i,
         use: [MiniCssExtractPlugin.loader, ...(TAILWIND ?["css-loader", "postcss-loader"]:["css-loader"])],
       },
     ],
   },
-  plugins: [
-    // new ChunksWebpackPlugin(),
-    new MiniCssExtractPlugin({
-      // filename: 'global.css', needs to be relative to output
-      filename: path.join("."+path.sep, "css", "[name].css"),
-      chunkFilename: path.join("."+path.sep, "css", "[id].css"),
-    }),
-    new HtmlWebpackPlugin({
-      template: path.join(process.cwd(), "public", "templates", MAIN_HTML),
-      filename: path.join(".."+path.sep, "templates", MAIN_HTML),
-    }),
-  ],
-
+  plugins: plugins,
   resolve: {
     extensions: [".js", ".jsx",".ts",".tsx"], // Add other extensions as needed
   },
+  infrastructureLogging: {
+    level: 'verbose',
+ },
+//  watch:true,
+  watchOptions: {
+  ignored: [
+    path.posix.resolve(process.cwd(), '_gingerjs',"build"),
+  ],
+},
 };
-
 module.exports = config;

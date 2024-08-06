@@ -306,17 +306,14 @@ def create_package_json(config, package_json_path):
     # Define dependencies based on user input
     dependencies = package_json.get("dependencies", {})
     dev_dependencies = package_json.get("devDependencies", {})
-    babel_config = package_json.get("babel",{})
 
     # Add or remove ShadCN dependency
     if config["create_app_settings"]["use_typescript"]:
         dev_dependencies["ts-loader"] = "^9.5.1"
         dev_dependencies["@babel/preset-typescript"] = "^7.24.7"
-        babel_config["presets"] = ["@babel/preset-env","@babel/typescript","@babel/preset-react"]
     else:
         dev_dependencies.pop("ts-loader", None)
         dev_dependencies.pop("@babel/preset-typescript", None)
-        babel_config["presets"] = ["@babel/preset-env","@babel/preset-react"]
 
     # Add or remove ShadCN dependency
     if config["create_app_settings"]["use_shadcn"]:
@@ -360,7 +357,6 @@ def create_package_json(config, package_json_path):
     # Update package.json
     package_json["dependencies"] = dependencies
     package_json["devDependencies"] = dev_dependencies
-    package_json["babel"] = babel_config
 
     with open(os.path.join(base,"package.json"), "w") as file:
         json.dump(package_json, file, indent=2)
@@ -421,6 +417,9 @@ def runserver(mode):
     """Runs the webapp"""
     try:
         settings = load_settings()
+        if settings.get("STATIC_SITE",False):
+            logger.info("Try gingerjs build as you are building a static site and change debug mode to have dev server")
+            return
         my_env = os.environ.copy()  # Copy the current environment
         if mode == "dev":
             settings["DEBUG"] = True
