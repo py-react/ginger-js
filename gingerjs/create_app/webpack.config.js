@@ -19,6 +19,17 @@ const CopyWebpackPlugin = require('copy-webpack-plugin');
 //   fp: "ramda/es", "immer";
 // }
 
+const getOverrides = ()=>{
+  if(fs.existsSync(path.resolve(process.cwd(), "ginger_conf.cjs"))){
+    const overrides = require(path.resolve(process.cwd(), "ginger_conf.cjs"))
+    return overrides
+  }
+  return {
+    webpack:{}
+  }
+}
+const overrides = getOverrides()
+
 const getNodeModulesRegExp = (deps) =>
   new RegExp(`[\\/]node_modules[\\/]${deps.join("|")}`);
 
@@ -273,6 +284,7 @@ const plugins = [
     // needs to be relative to output
     filename: STATIC_SITE?MAIN_HTML:path.join("..", "templates", MAIN_HTML)
   }),
+  ...("plugins" in overrides.webpack?overrides.webpack.plugins:[])
 ];
 
 function hasFiles(directory) {
@@ -331,14 +343,6 @@ const config = {
       }
     },
   }}),
-  resolve: {
-    root: path.resolve(process.cwd()),
-    alias: {
-      "@": "./src",
-      "src": "./src"
-    },
-    extensions: ["", ".ts", ".tsx", ".js"]
-  },
   optimization: {
     splitChunks: {
       minSize: 17000,
@@ -350,6 +354,8 @@ const config = {
       enforceSizeThreshold: 30000,
       ...splitChunks,
     },
+    ...("optimization" in overrides.webpack?overrides.webpack.optimization:{})
+    
   },
   module: {
     rules: [
@@ -388,20 +394,28 @@ const config = {
         test: /\.(css)$/i,
         use: [MiniCssExtractPlugin.loader, ...(TAILWIND ?["css-loader", "postcss-loader"]:["css-loader"])],
       },
+      ...(overrides.webpack.module && "rules" in overrides.webpack.module?overrides.webpack.module.rules:[])
     ],
   },
   plugins: plugins,
   resolve: {
     extensions: [".js", ".jsx",".ts",".tsx"], // Add other extensions as needed
+    ...("resolve" in overrides.webpack?overrides.webpack.resolve:{})
+
   },
   infrastructureLogging: {
     level: 'verbose',
+    ...("infrastructureLogging" in overrides.webpack?overrides.webpack.infrastructureLogging:{})
+
  },
 //  watch:true,
   watchOptions: {
-  ignored: [
-    path.posix.resolve(process.cwd(), '_gingerjs',"build"),
-  ],
-},
+    ignored: [
+      path.posix.resolve(process.cwd(), '_gingerjs',"build"),
+    ],
+    ...("watchOptions" in overrides.webpack?overrides.webpack.watchOptions:{})
+
+  },
 };
+
 module.exports = config;
