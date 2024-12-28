@@ -1,4 +1,4 @@
-
+import re
 import click
 import os
 import subprocess
@@ -51,24 +51,47 @@ def load_module(module_name,module_path):
     except Exception as e:
         raise e
 
-
-def find_process_by_port(port):
-    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-        try:
-            for conn in proc.connections(kind="tcp"):
-                if str(conn.laddr.port) == str(port):
-                    return proc
-        except psutil.AccessDenied:
-            continue
-        except psutil.NoSuchProcess:
-            continue
-    return None
-
 def kill_process(process):
     try:
         process.send_signal(signal.SIGTERM)
     except psutil.NoSuchProcess:
         pass
+
+def get_pids(port):
+    returnItems = []
+    command = "lsof -i :%s | awk '{print $2}'" % port
+    pids = subprocess.check_output(command, shell=True)
+    pids = pids.strip()
+    if pids:
+        pids = re.sub(' +', ' ', pids.decode("utf-8"))
+        for pid in pids.split('\n'):
+            try:
+                returnItems.append(int(pid)) 
+            except:
+                pass
+    return returnItems
+
+def run_uvicorn():
+    settings = load_settings()
+    # Kill the uvicorn process if running on the same port
+    port = int(settings.get("PORT", 5001))
+    pid = get_pids(port)
+    if len(pid):
+        pids = set(get_pids(port))
+        command = 'kill -9 {}'.format(' '.join([str(pid) for pid in pids]))
+        os.system(command)
+    else:
+        print(f"No existing uvicorn process found on port {port}")
+    
+    module_name = "create_app"
+    module = load_module(module_name,os.path.join(dir_path,"create_app.py"))
+    if hasattr(module, "create_app"):
+        module.create_app()
+    return subprocess.Popen([
+        "uvicorn", "_gingerjs.main:app", "--reload",
+        "--port", str(port),
+        "--host", settings.get("HOST")
+    ])
 
 def run_command(cmd, env=None, cwd=None):
     logger.debug(f"Running command: {cmd}")
@@ -80,13 +103,11 @@ def task_wrapper(func, name, *args, **kwargs):
     return func(*args, **kwargs)
 
 class ChangeHandler(FileSystemEventHandler):
-    def __init__(self,my_env,uvicorn_process_future,executor,run_uvicorn):
+    def __init__(self,my_env,uvicorn_process_future,executor):
         self.settings = load_settings()
         self.my_env = my_env
-        self.to_run = None
         self.uvicorn_process_future = uvicorn_process_future  # Future to get the process reference
         self.executor = executor
-        self.run_uvicorn = run_uvicorn
         for key, value in self.settings.items():
             self.my_env[key] = str(value)
     
@@ -102,23 +123,15 @@ class ChangeHandler(FileSystemEventHandler):
             return
         if event.is_directory:
             return
+        if event.src_path.endswith(".py"):
+            return
         self.debug_log(f"* Detected change in {event.src_path} ,reloading")
         self.restart(event.src_path)
 
     def restart(self,path):
-        if self.uvicorn_process_future and self.uvicorn_process_future.done():
-            uvicorn_process = self.uvicorn_process_future.result()
-            if uvicorn_process:
-                self.debug_log("Terminating Uvicorn process...")
-                uvicorn_process.terminate()  # Terminate the Uvicorn process
-                uvicorn_process.wait()  # Wait for the process to stop
-                self.debug_log("Uvicorn process terminated.")
-
-        module_name = "create_app"
-        module = load_module(module_name,os.path.join(dir_path,"create_app.py"))
-        if hasattr(module, "create_app"):
-            module.create_app()
-        self.uvicorn_process_future = self.executor.submit(self.run_uvicorn)
+        self.debug_log("Terminating Uvicorn process...")
+        self.uvicorn_process_future.cancel()
+        self.uvicorn_process_future = self.executor.submit(task_wrapper,run_uvicorn,"running server")
 
 class Execution_time ():
     def __init__ (self,start_time,name):
@@ -447,30 +460,17 @@ def runserver(mode):
             settings["DEBUG"] = True
             click.echo("Building app in in watch mode")
             try:
-                module_name = "create_app"
-                module = load_module(module_name,os.path.join(dir_path,"create_app.py"))
-                path = f".{os.path.sep}src"
-                def run_uvicorn():
-                    return subprocess.Popen([
-                        "uvicorn", "_gingerjs.main:app", "--reload",
-                        "--port", settings.get("PORT"),
-                        "--host", settings.get("HOST")
-                    ])
                 with ThreadPoolExecutor(max_workers=2) as executor:
-                    if hasattr(module,"create_app"):
-                        getattr(module, "create_app")()
-
-                    # Submit the Uvicorn command to be run by the executor and track the future
-                    uvicorn_process_future = executor.submit(run_uvicorn)
                     # Create event handler and pass in the future reference
-                    event_handler = ChangeHandler(my_env, uvicorn_process_future,executor,run_uvicorn)
+                    uvicorn_process_future = executor.submit(task_wrapper,run_uvicorn,"running server")
+                    event_handler = ChangeHandler(my_env, uvicorn_process_future,executor)
                     
                     observer = Observer()
                     def start_observer():
                         observer.start()
                         observer.join()
 
-                    observer.schedule(event_handler, path, recursive=True)
+                    observer.schedule(event_handler, f".{os.path.sep}src", recursive=True)
 
                     executor.submit(task_wrapper, start_observer,"File System Observer")
                     # Keep the main thread alive to let the executor complete its tasks
@@ -479,9 +479,6 @@ def runserver(mode):
                             pass
                     except KeyboardInterrupt:
                         observer.stop()
-                        uvicorn_process_future.terminate()  # Terminate the Uvicorn process
-                        uvicorn_process_future.wait()  # Wait for the process to stop
-                        executor.shutdown(wait=True)
 
             except  Exception as e:
                 raise e
