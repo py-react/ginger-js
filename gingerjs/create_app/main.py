@@ -80,17 +80,15 @@ def task_wrapper(func, name, *args, **kwargs):
     return func(*args, **kwargs)
 
 class ChangeHandler(FileSystemEventHandler):
-    def __init__(self, module,func_name,my_env):
-        self.module = module
+    def __init__(self,my_env,uvicorn_process_future,executor,run_uvicorn):
         self.settings = load_settings()
-        self.func_name = func_name
         self.my_env = my_env
         self.to_run = None
+        self.uvicorn_process_future = uvicorn_process_future  # Future to get the process reference
+        self.executor = executor
+        self.run_uvicorn = run_uvicorn
         for key, value in self.settings.items():
             self.my_env[key] = str(value)
-        if hasattr(self.module, self.func_name):
-            self.to_run = getattr(self.module, self.func_name)
-
     
     def debug_log(self, *args, **kwargs):
         if self.my_env["DEBUG"]:
@@ -108,10 +106,19 @@ class ChangeHandler(FileSystemEventHandler):
         self.restart(event.src_path)
 
     def restart(self,path):
-        if self.to_run:
-            self.to_run()
-        else:
-            raise AttributeError("Module has no attribute "+self.func_name)
+        if self.uvicorn_process_future and self.uvicorn_process_future.done():
+            uvicorn_process = self.uvicorn_process_future.result()
+            if uvicorn_process:
+                self.debug_log("Terminating Uvicorn process...")
+                uvicorn_process.terminate()  # Terminate the Uvicorn process
+                uvicorn_process.wait()  # Wait for the process to stop
+                self.debug_log("Uvicorn process terminated.")
+
+        module_name = "create_app"
+        module = load_module(module_name,os.path.join(dir_path,"create_app.py"))
+        if hasattr(module, "create_app"):
+            module.create_app()
+        self.uvicorn_process_future = self.executor.submit(self.run_uvicorn)
 
 class Execution_time ():
     def __init__ (self,start_time,name):
@@ -443,27 +450,37 @@ def runserver(mode):
                 module_name = "create_app"
                 module = load_module(module_name,os.path.join(dir_path,"create_app.py"))
                 path = f".{os.path.sep}src"
-
+                def run_uvicorn():
+                    return subprocess.Popen([
+                        "uvicorn", "_gingerjs.main:app", "--reload",
+                        "--port", settings.get("PORT"),
+                        "--host", settings.get("HOST")
+                    ])
                 with ThreadPoolExecutor(max_workers=2) as executor:
                     if hasattr(module,"create_app"):
                         getattr(module, "create_app")()
 
-                    event_handler = ChangeHandler(module, "create_app", my_env)
+                    # Submit the Uvicorn command to be run by the executor and track the future
+                    uvicorn_process_future = executor.submit(run_uvicorn)
+                    # Create event handler and pass in the future reference
+                    event_handler = ChangeHandler(my_env, uvicorn_process_future,executor,run_uvicorn)
+                    
                     observer = Observer()
-
                     def start_observer():
                         observer.start()
                         observer.join()
 
                     observer.schedule(event_handler, path, recursive=True)
+
                     executor.submit(task_wrapper, start_observer,"File System Observer")
-                    executor.submit(task_wrapper, run_command, "Run Uvicorn"," ".join(["uvicorn","_gingerjs.main:app","--reload","--port",settings.get("PORT"),"--host",settings.get("HOST")]), my_env, base)
                     # Keep the main thread alive to let the executor complete its tasks
                     try:
                         while True:
                             pass
                     except KeyboardInterrupt:
                         observer.stop()
+                        uvicorn_process_future.terminate()  # Terminate the Uvicorn process
+                        uvicorn_process_future.wait()  # Wait for the process to stop
                         executor.shutdown(wait=True)
 
             except  Exception as e:

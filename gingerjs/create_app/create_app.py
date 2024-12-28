@@ -375,7 +375,7 @@ def create_react_app_with_routes(paths, debug):
 
             const [propsData,setPropData] = useState(()=>(()=>{{
                 try {{
-                    const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
+                    const data = JSON.parse(JSON.stringify(window.flask_react_app_props))
                     return data
                 }}catch(err){{
                     return props
@@ -384,9 +384,9 @@ def create_react_app_with_routes(paths, debug):
 
             useEffect(()=>{{
                 setLoading(true)
-                    const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
-                    setPropData(data)
-                    setLoading(false)
+                const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
+                setPropData(data)
+                setLoading(false)
                 return ()=>{{
                     setLoading(false)
                 }}

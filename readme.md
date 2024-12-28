@@ -321,6 +321,54 @@ def meta_data():
     }
 ```
 
+Overide config 
+```js
+// create a "ginger_conf.cjs" at root of the project and add the below in the file
+
+module.exports = {
+    webpack:{}
+}
+```
+
+Extend main app
+```python
+from fastapi import FastAPI,Request
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from datetime import datetime
+import time
+
+
+class RequestLoggerMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Record the start time
+        start_time = time.time()
+        
+        # Log request method and URL
+        
+        # Process the request and get the response
+        response = await call_next(request)
+        
+        # Record the end time
+        end_time = time.time()
+        
+        # Calculate the time taken for the request
+        duration = round(end_time - start_time, 4)  # Duration in seconds, rounded to 4 decimal places
+        
+        # Log the response status code and time taken
+        print(f"Time taken: {duration} seconds | [{request.method}] {request.url.path} | Response status code: {response.status_code} ")
+        
+        return response
+
+# Function to extend the app by adding routes
+def extend_app(app: FastAPI):
+    # Add the custom RequestLoggerMiddleware
+    app.add_middleware(RequestLoggerMiddleware)
+   
+
+
+```
+
 
 ## Using this project locally
 

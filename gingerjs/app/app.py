@@ -1,11 +1,21 @@
 from os import environ,path,getcwd
 from fastapi import FastAPI, HTTPException
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from gingerjs.create_app.load_settings import load_settings
 from fastapi.routing import APIRoute
 from fastapi.responses import FileResponse
 from gingerjs import add_url_rules
+import importlib.util
+
+def load_module(module_name,module_path):
+    try:
+        module_name = module_name
+        spec = importlib.util.spec_from_file_location(module_name, module_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    except Exception as e:
+        raise e
 
 def app_context(request):
     return {'app': request.app}
@@ -20,6 +30,17 @@ class App(FastAPI):
         self.setTemplateEngine()
         self.setStaticPath()
         self.add_url()
+        self.extend_app()
+
+    def extend_app(self):
+        working_dir = self.settings["CWD"]
+        app_name = self.settings["NAME"]
+        try:
+            app_module_present = load_module("extend_app",path.join(working_dir,app_name,f"main.py"))
+            if app_module_present:
+                app_module_present.extend_app(self)
+        except Exception as e:
+            print(e)
     
     def add_url(self):
         # Generate Flask routes

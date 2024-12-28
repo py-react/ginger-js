@@ -343,20 +343,21 @@ const config = {
       }
     },
   }}),
-  optimization: {
-    splitChunks: {
-      minSize: 17000,
-      minRemainingSize: 0,
-      minChunks: 1,
-      maxAsyncRequests: 30,
-      maxInitialRequests: 30,
-      automaticNameDelimiter: "_",
-      enforceSizeThreshold: 30000,
-      ...splitChunks,
+  ...(MODE==="development"?{}:{
+    optimization: {
+      splitChunks: {
+        minSize: 17000,
+        minRemainingSize: 0,
+        minChunks: 1,
+        maxAsyncRequests: 30,
+        maxInitialRequests: 30,
+        automaticNameDelimiter: "_",
+        enforceSizeThreshold: 30000,
+        ...splitChunks,
+      },
+      ...("optimization" in overrides.webpack?overrides.webpack.optimization:{})
     },
-    ...("optimization" in overrides.webpack?overrides.webpack.optimization:{})
-    
-  },
+  }),
   module: {
     rules: [
       {
