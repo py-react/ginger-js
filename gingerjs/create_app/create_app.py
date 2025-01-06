@@ -315,7 +315,7 @@ def create_react_app_with_routes(paths, debug):
 
     to_return = [
         f"""
-        import React, {{ useState, useEffect,useRef,useCallback }} from 'react';
+        import React, {{ useState, useEffect,useRef,useCallback,createContext,useContext }} from 'react';
         {importErrCompo}
         import GenericNotFound from ".{os.path.sep}GenericNotFound"   
         import {{ BrowserRouter as Router, Route, Routes, Outlet, useLocation }} from 'react-router-dom';     
@@ -328,6 +328,8 @@ def create_react_app_with_routes(paths, debug):
             return <Outlet/>
         }})
 
+        export const LoaderContext = createContext({{}})
+
 
         const DefaultLoader_ = ({{isLoading}}) => {{
             const [progress, setProgress] = useState(0);
@@ -337,33 +339,49 @@ def create_react_app_with_routes(paths, debug):
                 if (isLoading) {{
                     setLoading(true);
                     setProgress(0);
+                    let startTime = Date.now();
+
                     interval = setInterval(() => {{
                         setProgress((prev) => {{
-                            if (prev < 90) {{
-                                if(prev+1===100){{
-                                    return prev
-                                }}
-                                return prev + 0.5; // Adjust the increment as needed for smoother progress
+                            // Calculate elapsed time
+                            const elapsedTime = Date.now() - startTime;
+                            let speedFactor = 1;
+
+                            // Change speed depending on how long the loader has been active
+                            if (elapsedTime < 2000) {{
+                                // Accelerate in the first 2 seconds
+                                speedFactor = 1 + Math.sin(elapsedTime / 1000) * 0.8; // Sinusoidal speed change
+                            }} else if (elapsedTime < 4000) {{
+                                // Slow down after 2 seconds
+                                speedFactor = 1 - Math.sin(elapsedTime / 2000) * 0.8; // Decelerating pattern
                             }}
-                            return prev;
+
+                            // Prevent the progress from exceeding 100%
+                            let newProgress = prev + (speedFactor * 0.8); // Adjust increment dynamically
+
+                            if (newProgress >= 100) {{
+                                newProgress = 100; // Cap progress at 100%
+                            }}
+
+                            return newProgress;
                         }});
-                    }}, 50); // Adjust the interval duration as needed
-                    console.log("added interval")
+                    }}, 50); // Interval duration can stay constant
 
                 }} else {{
-                    setProgress(100); // complete the progress bar
-                    setTimeout(() => setLoading(false), 0); // wait for the completion transition
+                    // Ensure progress is completed when stopping
+                    setProgress(100);
+                    setTimeout(() => setLoading(false), 300); // Brief delay before setting loading to false
                 }}
-                return () => clearInterval(interval);
+
+                return () => {{
+                    clearInterval(interval);
+                }};
             }}, [isLoading]);
 
             if (!loading) return null;
             return (
-                <div className="backdrop">
-                    <div className="progress-bar" style={{{{ width: `${{progress}}%` }}}}></div>
-                    <noscript>
-                        <div style={{{{color:"#fff"}}}}>Your browser does not support JavaScript!</div>
-                    </noscript>
+                <div className="custom-backdrop">
+                    <div className="custom-progress-bar" style={{{{ width: `${{progress}}%` }}}}></div>
                 </div>
             );
         }};
@@ -371,7 +389,7 @@ def create_react_app_with_routes(paths, debug):
 
         const PropsProvider = ({{Element,Fallback,...props}})=>{{
             const location = useLocation()
-            const [loading,setLoading] = useState(true)
+            const [loading,setLoading] = useState(false)
 
             const [propsData,setPropData] = useState(()=>(()=>{{
                 try {{
@@ -383,20 +401,37 @@ def create_react_app_with_routes(paths, debug):
             }})())
 
             useEffect(()=>{{
-                setLoading(true)
-                const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
-                setPropData(data)
-                setLoading(false)
+                React.startTransition(()=>{{
+                    const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
+                    setPropData(data)
+                    setLoading(false)
+                }})
                 return ()=>{{
                     setLoading(false)
                 }}
             }},[location])
 
+            useEffect(() => {{
+                // Define a function to update the loading state
+                const handleLoadingEvent = (event) => {{
+                    setLoading(event.detail);  // Update state based on the event's detail
+                }};
+
+                // Listen for the custom event on the window object
+                window.addEventListener('loadingEvent', handleLoadingEvent);
+
+                // Clean up the event listener when the component unmounts
+                return () => {{
+                    window.removeEventListener('loadingEvent', handleLoadingEvent);
+                }};
+            }}, []);
+
             return (
-                <React.Suspense fallback={{<Fallback isLoading={{true}} />}}>
+                <React.Suspense fallback={{<Fallback isLoading={{loading}} />}}>
                     <Element {{...propsData}} />
                     <Fallback isLoading={{loading}} />
-                </React.Suspense >
+                </React.Suspense>
+
             )
         }}
 
@@ -447,11 +482,9 @@ def create_react_app_with_routes(paths, debug):
             }},[propsData])
             
             return (
-                <React.Suspense fallback={{<></>}}>
-                    <>
-                        {{Elem}}
-                    </>
-                </React.Suspense>
+                <>
+                    {{Elem}}
+                </>
             )
         }}
 
@@ -772,7 +805,7 @@ def create_app():
     cwd = os.getcwd()
     if cwd is None:
         raise ValueError("Current working directory not provided")
-
+    
     inital_setup_before_babel()
     if (not settings.get("STATIC_SITE",False)):
         babel_command = [
@@ -800,11 +833,12 @@ def create_app():
     if not os.path.exists(os.path.join(base,"public","static")):
         os.makedirs(os.path.join(base,"public","static"),exist_ok=True)
 
-    # copy_public_static()
+    copy_public_static()
     
     if settings.get("STATIC_SITE",False) and debug:
         subprocess.run(["yarn" if package_manager == "yarn" else "npx", "webpack","serve","--progress", "--config",os.path.join(os.path.dirname(__file__),"webpack.config.js")], cwd=base, check=True, env=my_env)
     
     if not debug:
         subprocess.run(["rm", "-rf", os.path.sep.join([".","","_gingerjs","__build__"])], check=True, cwd=cwd)
+
 

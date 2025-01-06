@@ -6,6 +6,8 @@ from fastapi.routing import APIRoute
 from fastapi.responses import FileResponse
 from gingerjs import add_url_rules
 import importlib.util
+from pathlib import Path
+import json
 
 def load_module(module_name,module_path):
     try:
@@ -31,6 +33,14 @@ class App(FastAPI):
         self.setStaticPath()
         self.add_url()
         self.extend_app()
+        self.generate_openapi_schema()
+
+    def generate_openapi_schema(self):
+        output_file = "./public/static/openapi.json"
+        schema = self.openapi()
+        output_path = Path(output_file)
+        output_path.write_text(json.dumps(schema, indent=2))
+        print(f"OpenAPI schema saved to {output_file}")
 
     def extend_app(self):
         working_dir = self.settings["CWD"]
@@ -65,6 +75,7 @@ class App(FastAPI):
             endpoint=serve_static_file,
             methods=["GET"],
             response_class=FileResponse,
+            name="static"
         )
         self.router.routes.append(route)
     

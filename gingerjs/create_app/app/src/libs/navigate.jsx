@@ -1,5 +1,12 @@
 import { useCallback } from "react";
 
+// Function to trigger the custom event
+function triggerLoadingEvent(isLoading) {
+  const event = new CustomEvent('loadingEvent', { detail: isLoading });
+  window.dispatchEvent(event);
+}
+
+
 const useNavigate = () => {
   
   const navigate = useCallback((path, { replace = false } = {}) => {
@@ -14,6 +21,7 @@ const useNavigate = () => {
     }
 
     try {
+      triggerLoadingEvent(true)
       // Function to make a GET request
       function getData(url, headers, callback) {
         var xhr = new XMLHttpRequest();
@@ -88,6 +96,7 @@ const useNavigate = () => {
           left: 0, 
           behavior: 'instant' 
         })
+        triggerLoadingEvent(false)
       }
 
       // Make the GET request and replace HTML

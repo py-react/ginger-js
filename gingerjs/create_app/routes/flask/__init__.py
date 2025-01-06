@@ -76,9 +76,10 @@ def define_routes(app:FastAPI,root_folder,route_type,bridge,*args, **kwargs):
                                 if hasattr(module, method):
                                     route = APIRoute(
                                         path=f"/api{url_rule}",
+                                        name="",
                                         endpoint=api(getattr(module, method)),
                                         methods=[method],
-                                        response_class=JSONResponse,
+                                        response_class= JSONResponse,
                                         dependencies=dependencies
                                     )
                                     app.router.routes.append(route)
@@ -97,6 +98,7 @@ def define_routes(app:FastAPI,root_folder,route_type,bridge,*args, **kwargs):
                                 routes_tree.append(f"Route '{url_rule}' attached it using index.py in {dirpath}")
                                 route =APIRoute(
                                     path=url_rule,
+                                    name="",
                                     endpoint=view(module,bridge,app),
                                     methods=["GET"],
                                     response_class=HTMLResponse,
@@ -106,6 +108,7 @@ def define_routes(app:FastAPI,root_folder,route_type,bridge,*args, **kwargs):
                                 routes_tree.append(f"Route '{url_rule}' attached it using index.py in {dirpath}")
                                 route =APIRoute(
                                     path=url_rule,
+                                    name="",
                                     endpoint=view(module,bridge,app,True),
                                     methods=["GET"],
                                     response_class=HTMLResponse,

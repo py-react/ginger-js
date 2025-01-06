@@ -333,7 +333,7 @@ const config = {
     hot: true,
     compress: true,
     open:true,
-    port: process.env.PORT||5001,
+    port: process.env.PORT|| 5001,
     client: {
       logging: 'info',
       overlay: {
@@ -342,6 +342,7 @@ const config = {
         runtimeErrors: true,
       }
     },
+    ...("devServer" in overrides.webpack?overrides.webpack.devServer:{})
   }}),
   ...(MODE==="development"?{}:{
     optimization: {

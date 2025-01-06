@@ -31,12 +31,6 @@ Now, you need to install GingerJS using `pip`. Open your terminal or command pro
 ```shell
 pip install git+https://github.com/ginger-society/ginger-js.git
 ```
-Alternatively:
-
-```bash
-pip install ginger-js
-```
-
 
 ### Create your app
 
@@ -62,14 +56,14 @@ Some of the main py-react features include:
 
 Feature | Description
 --- | --- 
-Routing | A file-system based router built on top of Flask and Server Components that supports layouts, nested routing, loading states, and more. 
+Routing | A file-system based router built on top of FastAPI and Server Components that supports layouts, nested routing, loading states, and more. 
 Rendering | Client-side and Server-side Rendering with Client and Server Components. Further optimized with Static and Dynamic Rendering on the server with py-react.
 Styling | Support for your preferred styling methods, including CSS Modules, Tailwind CSS, and CSS-in-JS
 
 ## Pre-Requisite Knowledge
 Although our docs are designed to be beginner-friendly, we need to establish a baseline so that the docs can stay focused on py-react functionality. We'll make sure to provide links to relevant documentation whenever we introduce a new concept.
 
-To get the most out of our docs, it's recommended that you have a basic understanding of Flask,HTML, CSS, and React. If you need to brush up on your React skills, check out this [React Foundations Course](https://nextjs.org/learn/react-foundations) and [FLask](https://flask.palletsprojects.com/en/3.0.x/), which will introduce you to the fundamentals.
+To get the most out of our docs, it's recommended that you have a basic understanding of FastAPI,HTML, CSS, and React. If you need to brush up on your React skills, check out this [React Foundations Course](https://nextjs.org/learn/react-foundations) and [FastAPI](https://fastapi.tiangolo.com/), which will introduce you to the fundamentals.
 
 
 ## Creating your First Page
@@ -364,10 +358,27 @@ class RequestLoggerMiddleware(BaseHTTPMiddleware):
 def extend_app(app: FastAPI):
     # Add the custom RequestLoggerMiddleware
     app.add_middleware(RequestLoggerMiddleware)
-   
-
 
 ```
+
+### Using FastAPI with Type Safety
+
+Below snippets demonstrates how to use the FastAPI client with type safety for improved developer experience and better integration.
+
+#### Step 1: Import the Service
+Begin by importing the service module into your project
+```js
+import { DefaultService } from "@/gingerJs_api_client";
+```
+This will allow you to interact with the API endpoints defined in the FastAPI server.
+
+#### Step 2: Call the Service
+You can now call the service method using type-safe functions. For example, to make an API request to the apiTestGet endpoint:
+
+```js
+await DefaultService.apiTestGet()
+```
+By leveraging the type safety features, you get better auto-completion, error handling, and validation during development.
 
 
 ## Using this project locally

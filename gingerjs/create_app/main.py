@@ -3,18 +3,18 @@ import click
 import os
 import subprocess
 import shutil
-import os
 import signal
-import sys
 import time
 from gingerjs.create_app.load_settings import load_settings
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import psutil
 import importlib.util
-from concurrent.futures import ThreadPoolExecutor
 from .user_input import main
 import json
+import multiprocessing
+
+
 
 class Logger():
     def __init__(self, name):
@@ -87,7 +87,8 @@ def run_uvicorn():
     module = load_module(module_name,os.path.join(dir_path,"create_app.py"))
     if hasattr(module, "create_app"):
         module.create_app()
-    return subprocess.Popen([
+    # Since we don't use subprocess, os.popen gives us a way to capture stdout and stderr.
+    subprocess.run([
         "uvicorn", "_gingerjs.main:app", "--reload",
         "--port", str(port),
         "--host", settings.get("HOST")
@@ -103,13 +104,14 @@ def task_wrapper(func, name, *args, **kwargs):
     return func(*args, **kwargs)
 
 class ChangeHandler(FileSystemEventHandler):
-    def __init__(self,my_env,uvicorn_process_future,executor):
+    def __init__(self,my_env):
         self.settings = load_settings()
         self.my_env = my_env
-        self.uvicorn_process_future = uvicorn_process_future  # Future to get the process reference
-        self.executor = executor
         for key, value in self.settings.items():
             self.my_env[key] = str(value)
+        # list of all processes, so that they can be killed afterwards 
+        self.all_processes = []
+        self.start()
     
     def debug_log(self, *args, **kwargs):
         if self.my_env["DEBUG"]:
@@ -117,21 +119,24 @@ class ChangeHandler(FileSystemEventHandler):
 
     def on_any_event(self, event):
         # Ignore events in __pycache__ directories
-        if "_gingerjs" in event.src_path:
-            return
-        if '__pycache__' in event.src_path or ".py" in event.src_path:
+        if any(substring in event.src_path for substring in ["__pycache__","gingerJs_api_client","_gingerjs"])  or event.src_path.endswith(".py"):
             return
         if event.is_directory:
             return
-        if event.src_path.endswith(".py"):
-            return
         self.debug_log(f"* Detected change in {event.src_path} ,reloading")
-        self.restart(event.src_path)
+        self.start()
+        # self.start(event.src_path)
 
-    def restart(self,path):
+    def start(self):
+        """Start the command in a new thread."""
         self.debug_log("Terminating Uvicorn process...")
-        self.uvicorn_process_future.cancel()
-        self.uvicorn_process_future = self.executor.submit(task_wrapper,run_uvicorn,"running server")
+        for process in self.all_processes:
+            process.terminate()
+
+        print("Starting new command thread...")
+        process = multiprocessing.Process(target=run_uvicorn)
+        process.start()
+        self.all_processes.append(process)
 
 class Execution_time ():
     def __init__ (self,start_time,name):
@@ -431,6 +436,7 @@ def create_app():
         copy_file_if_not_exists(os.path.join(dir_path,"app","public"),os.path.join(cwd,"public"),{"not_found.html","bad_request_exception_template.html","content.html","exception_template_debug.html","internal_server_exception_template.html","layout.html","exception_template.html",} if settings.get('STATIC_SITE') else {} )
         copy_file_if_not_exists(os.path.join(dir_path,"app","src"),os.path.join(cwd,"src"),{"api","index.py"} if settings.get('STATIC_SITE') else {},{".jsx":".tsx",".js":".ts"} if config['create_app_settings']['use_typescript'] else {})
         create_dir(os.path.join(cwd,"public","static"))
+        copy_file_if_not_exists(os.path.join(dir_path,"app","public","static","gingerjs_logo.png"),os.path.join(cwd,"public","static","gingerjs_logo.png"))
         create_dir(os.path.join(cwd,"src","components"))
         click.echo("App set up completed")
     else:
@@ -459,29 +465,21 @@ def runserver(mode):
         if mode == "dev":
             settings["DEBUG"] = True
             click.echo("Building app in in watch mode")
+            event_handler = ChangeHandler(my_env)
+            observer = Observer()
+            observer.schedule(event_handler, path=f".{os.path.sep}src", recursive=True)  # Monitor current directory
+
             try:
-                with ThreadPoolExecutor(max_workers=2) as executor:
-                    # Create event handler and pass in the future reference
-                    uvicorn_process_future = executor.submit(task_wrapper,run_uvicorn,"running server")
-                    event_handler = ChangeHandler(my_env, uvicorn_process_future,executor)
-                    
-                    observer = Observer()
-                    def start_observer():
-                        observer.start()
-                        observer.join()
-
-                    observer.schedule(event_handler, f".{os.path.sep}src", recursive=True)
-
-                    executor.submit(task_wrapper, start_observer,"File System Observer")
-                    # Keep the main thread alive to let the executor complete its tasks
-                    try:
-                        while True:
-                            pass
-                    except KeyboardInterrupt:
-                        observer.stop()
-
-            except  Exception as e:
-                raise e
+                # Start the initial subprocess and begin watching for changes
+                observer.start()
+                print("Watching for changes...")
+                while True:
+                    time.sleep(1)  # Keep the program running to watch for events
+            except KeyboardInterrupt:
+                print("Exiting...")
+                observer.stop()
+            finally:
+                observer.join()
             return
         
         settings["DEBUG"] = False
