@@ -17,7 +17,7 @@ def match_static_to_dynamic(static_path, dynamic_path_pattern):
     """
     # Convert dynamic path pattern to regex
     # Example: /api/test/{testId} => ^/api/test/(?P<testId>[^/]+)$
-    pattern = dynamic_path_pattern
+    pattern = dynamic_path_pattern[:-1] if dynamic_path_pattern.endswith("/") else dynamic_path_pattern
     pattern = re.sub(r'\{(\w+)\}', r'[^/]+', pattern)  # Replace {param} with a regex for non-slash characters
     pattern = '^' + pattern + '$'  # Anchor pattern to match the entire path
 
@@ -35,7 +35,7 @@ def Create_Layout_Middleware_Class(middleware_func,route):
 
             async def dispatch(self, request: Request, call_next):
                 # Check if the request path needs authentication
-                if match_static_to_dynamic(request.url.path,route) and not request.url.path.startswith("/api/"):
+                if match_static_to_dynamic(request.url.path,route) and not request.url.path.startswith("/api/") and not request.url.path.startswith("/static/"):
                     layoutData = await middleware_func(request)
                     if hasattr(request,"prop_data"):
                         request.state.prop_data[route] = layoutData

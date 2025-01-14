@@ -126,7 +126,7 @@ def create_routes(data, parent_path="/",last_path="",parentLoader="", debug=Fals
         routes.append(f"""
                 <Route path="{replace_wildcards(parent)}" 
                     element = {{
-                        <LayoutPropsProvider forUrl={{"{full_parent_path+"/"}"}} Element={{{layout_comp}}} {{...props}}/>
+                        <LayoutPropsProvider key={{"{full_parent_path+"/"}"}} Fallback={{{loader}}} forUrl={{"{full_parent_path+"/"}"}} Element={{{layout_comp}}} {{...props}}/>
                     }}
                     
                 >
@@ -324,9 +324,9 @@ def create_react_app_with_routes(paths, debug):
         {generate_import_statements(node_data)}
         
 
-        const DefaultLayout_ = React.memo(()=>{{
+        const DefaultLayout_ = ()=>{{
             return <Outlet/>
-        }})
+        }}
 
         export const LoaderContext = createContext({{}})
 
@@ -401,11 +401,9 @@ def create_react_app_with_routes(paths, debug):
             }})())
 
             useEffect(()=>{{
-                React.startTransition(()=>{{
-                    const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
-                    setPropData(data)
-                    setLoading(false)
-                }})
+                const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
+                setPropData(data)
+                setLoading(false)
                 return ()=>{{
                     setLoading(false)
                 }}
@@ -427,7 +425,7 @@ def create_react_app_with_routes(paths, debug):
             }}, []);
 
             return (
-                <React.Suspense fallback={{<Fallback isLoading={{loading}} />}}>
+                <React.Suspense fallback={{<Fallback isLoading={{true}} />}}>
                     <Element {{...propsData}} />
                     <Fallback isLoading={{loading}} />
                 </React.Suspense>
@@ -438,27 +436,40 @@ def create_react_app_with_routes(paths, debug):
         const LayoutPropsProvider = ({{Element,Fallback , forUrl, ...props}})=>{{
             const location = useLocation();
             const [propsData,setPropsData] = useState((()=>{{
-                if ("layout_props" in props) {{
-                    const layouts = Object.keys(props.layout_props).filter((key) => {{
-                        if (location.pathname.includes(key)) {{
-                            return {{ ...props.layout_props[key], location: props.location }};
-                        }}
-                    }});
-                    let currentLayoutProp = undefined
-                    for(let i=0;i<layouts.length;i++){{
-                        if(matchPath({{ path: layouts[i], exact: true }},forUrl)){{
-                            currentLayoutProp = props.layout_props[layouts[i]]
-                            break
-                        }}
+                try {{
+                    const data = JSON.parse(JSON.stringify(window.flask_react_app_props))
+                    if ("layout_props" in data){{
+                        Object.keys(data.layout_props).map(key=>{{
+                            if (location.pathname.includes(key.endsWith("/")?key.substr(0,key.length-1):key) && matchPath({{ path: location.pathname, exact: true }},forUrl)){{
+                                React.startTransition(()=>{{
+                                    setPropsData({{...data.layout_props[key],location:props.location}})
+                                }})
+                            }}
+                        }})
                     }}
-                    if(currentLayoutProp){{
-                        return currentLayoutProp
-                    }}else{{
+                    return data
+                }}catch(err){{
+                    if ("layout_props" in props) {{
+                        const layouts = Object.keys(props.layout_props).filter((key) => {{
+                            if (location.pathname.includes(key.endsWith("/")?key.substr(0,key.length-1):key)) {{
+                                return {{ ...props.layout_props[key], location: props.location }};
+                            }}
+                        }});
+                        let currentLayoutProp = undefined
+                        for(let i=0;i<layouts.length;i++){{
+                            if(matchPath({{ path: layouts[i], exact: true }},forUrl)){{
+                                currentLayoutProp = props.layout_props[layouts[i]]
+                                break
+                            }}
+                        }}
+                        if(currentLayoutProp){{
+                            return currentLayoutProp
+                        }}else{{
+                            return props;
+                        }}
+                    }} else {{
                         return props;
                     }}
-                    // return props;
-                }} else {{
-                    return props;
                 }}
             }})())
 
@@ -466,13 +477,12 @@ def create_react_app_with_routes(paths, debug):
                 const data  = JSON.parse(JSON.stringify(window.flask_react_app_props))
                 if ("layout_props" in data){{
                     Object.keys(data.layout_props).map(key=>{{
-                        if (location.pathname.includes(key) && matchPath({{ path: location.pathname, exact: true }},forUrl)){{
+                        if (location.pathname.includes(key.endsWith("/")?key.substr(0,key.length-1):key) && matchPath({{ path: location.pathname, exact: true }},forUrl)){{
                             React.startTransition(()=>{{
                                 setPropsData({{...data.layout_props[key],location:props.location}})
                             }})
                         }}
                     }})
-
                 }}
                 
             }},[location])
@@ -482,9 +492,9 @@ def create_react_app_with_routes(paths, debug):
             }},[propsData])
             
             return (
-                <>
-                    {{Elem}}
-                </>
+            <React.Suspense fallback={{<Fallback isLoading={{true}} />}}>
+                <Element {{...propsData}} />
+            </React.Suspense>
             )
         }}
 
