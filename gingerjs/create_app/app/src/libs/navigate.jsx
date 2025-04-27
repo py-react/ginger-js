@@ -64,7 +64,6 @@ const useNavigate = () => {
           document.querySelector(".serverScript").remove()
           // Append the script to the current document to execute it
           document.body.appendChild(newScript);
-          window.__enableScroll__()
 
         }
         // Get the title

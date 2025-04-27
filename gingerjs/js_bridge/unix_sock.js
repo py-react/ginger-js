@@ -118,9 +118,7 @@ try {
 
   server.listen(socketPath, async () => {
     console_log(`Node Bride listening on ${socketPath}`);
-    if (fs.existsSync(socketPath)) {
-      fs.chmodSync(socketPath, "777");
-    }
+    fs.chmodSync(socketPath, 0o777);
   });
   // Handle shutdown signal
   const shutdown = () => {

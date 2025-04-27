@@ -489,7 +489,18 @@ def runserver(mode):
             module = load_module(module_name,os.path.join(dir_path,"create_app.py"))
             if hasattr(module, "create_app"):
                 module.create_app()
-            subprocess.run([f"uvicorn","_gingerjs.main:app","--port",settings.get("PORT"),"--host",settings.get("HOST")], check=True, cwd=base,env=my_env)
+            # Define the socket path
+            socket_path = os.path.join(os.getcwd(),"_gingerjs", f"unix.sock")
+            # Start the Node.js server as a subprocess
+            node_process_path = os.path.join(dir_path,"../js_bridge", "unix_sock.js")
+            LOCKFILE = "/tmp/my_subprocess.lock"
+            if os.path.exists(LOCKFILE):
+                print("Another worker already started the subprocess.")
+            else:
+                node_process = subprocess.Popen(['node', node_process_path,f"debug={os.environ.get('DEBUG','False')}",f'cwd={os.getcwd()}',f"sock_path={socket_path}"])
+                with open(LOCKFILE, "w") as f:
+                    f.write(str(node_process.pid))
+            subprocess.run([f"uvicorn","_gingerjs.main:app","--port",settings.get("PORT"),"--host",settings.get("HOST"),"--workers",settings.get("UVICORN_WORKERS")], check=True, cwd=base,env=my_env)
         except  Exception as e:
             raise e
 

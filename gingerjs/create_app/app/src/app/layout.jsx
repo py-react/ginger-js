@@ -5,9 +5,11 @@ import { ThemeProvider } from "src/libs/theme-provider"
 function Layout() {
   return (
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-      <div className='dark:bg-gray-800 dark:text-white'><Outlet /></div>
+      <div className="dark:bg-gray-800 dark:text-white">
+        <Outlet />
+      </div>
     </ThemeProvider>
-  )
+  );
 }
 
 export default Layout
