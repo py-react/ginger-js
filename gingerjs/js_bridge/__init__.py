@@ -11,7 +11,6 @@ class JSBridge:
             cls._instance = super(JSBridge, cls).__new__(cls)
             cls._instance.socket_path = None
             cls._instance.connected = False
-            cls._instance.node_process = None
             cls._instance.debug = False
         return cls._instance
 
@@ -19,42 +18,17 @@ class JSBridge:
         if(self.debug):
             print(f"{os.getpid()} JSBridge logs: "+str(msg))
 
-    def kill_bridge(self):
-        if self.node_process!= None:
-            self.debug_log("Trying to terminate the node process")
-            self.node_process.terminate()
-            try:
-                self.node_process.wait(timeout=5)  # Wait for the process to terminate
-                self.node_process = None
-                self.debug_log("Terminated")
-            except Exception as e:
-                self.debug_log("Exception: " ,e)
-                self.node_process.kill()
-                self.kill_bridge()
-
     def initialize(self,*args,**kwargs):
         if self.connected:
             self.debug("Client initiated")
             return
         self.debug = kwargs.get("debug",False)
-        dir_path = os.path.dirname(os.path.abspath(__file__))
-        # Define the socket path
-        self.socket_path = os.path.join(os.getcwd(),"_gingerjs", f"unix.sock")
-        # self.socket_path = os.path.join(dir_path, f"unix_{os.getpid()if os.environ.get('DEBUG','False')=='False'else'dev'}.sock")
-        # Start the Node.js server as a subprocess
-        node_process_path = os.path.join(dir_path, "unix_sock.js")
-        if(os.path.exists(self.socket_path)):
-            try:
-                os.remove(self.socket_path)
-            except Exception as e:
-                self.debug_log(f"An Error occured when removing unix.sock file")
-        self.node_process = subprocess.Popen(['node', node_process_path,f"debug={os.environ.get('DEBUG','False')}",f'cwd={os.getcwd()}',f"sock_path={self.socket_path}"])
 
-        self.debug_log(f"Booted worker with pid : {self.node_process.pid}")
         # Create a Unix socket
         try:
+            # Define the socket path
+            self.socket_path = os.path.join(os.getcwd(),"_gingerjs", f"unix.sock")
             # Wait a bit to ensure the server has started
-            time.sleep(1)
             client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             # Wait a bit to ensure the client is connected
             self.debug_log(f"Calling connect")
@@ -64,7 +38,6 @@ class JSBridge:
             self.connected = True
         except Exception as e:
             self.debug_log("Exception : Unable to create bridge between app and node ",str(e))
-            self.kill_bridge()
 
     def get_client(self):
         self.debug_log("Getting Client")
