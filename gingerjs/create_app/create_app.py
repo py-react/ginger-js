@@ -315,7 +315,7 @@ def create_react_app_with_routes(paths, debug):
 
     to_return = [
         f"""
-        import React, {{ useState, useEffect,useRef,useCallback,createContext,useContext }} from 'react';
+        import React, {{ useState, useEffect,createContext }} from 'react';
         {importErrCompo}
         import GenericNotFound from ".{os.path.sep}GenericNotFound"   
         import {{ BrowserRouter as Router, Route, Routes, Outlet, useLocation }} from 'react-router-dom';     
@@ -634,7 +634,7 @@ def generate_main_client_entry():
         if(!container) return
         window.flask_react_app_props = {{}}
         try{{
-            ReactDOM.render(<React.StrictMode><Router><App {{...getServerProps({{}})}}/></Router></React.StrictMode>,container)
+            createRoot(container).render(<React.StrictMode><Router><App {{...getServerProps({{}})}}/></Router></React.StrictMode>)
         }}catch(err){{
             console.log({{err}})
         }}
