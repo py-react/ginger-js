@@ -25,7 +25,7 @@ class JSBridge:
         # Create a Unix socket
         try:
             # Define the socket path
-            self.socket_path = os.path.join(os.getcwd(),"_gingerjs", f"unix.sock")
+            self.socket_path = "/tmp/gingerjs_unix.sock"
             # Wait a bit to ensure the server has started
             client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             # Wait a bit to ensure the client is connected

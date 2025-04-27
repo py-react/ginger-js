@@ -456,12 +456,25 @@ def create_app():
 def runserver(mode):
     """Runs the webapp"""
     try:
+
         my_env = os.environ.copy()  # Copy the current environment
         settings = load_settings()
         if settings.get("STATIC_SITE",False):
             logger.info("This is a dev server, Change DEBUG to False to build production app")
             subprocess.run(["gingerjs","build"],check=True,env=my_env)
             return
+        # Define the socket path
+        socket_path = "/tmp/gingerjs_unix.sock"
+        # Start the Node.js server as a subprocess
+        node_process_path = os.path.join(dir_path, "..", "js_bridge", "unix_sock.js")
+        LOCKFILE = "/tmp/my_subprocess.lock"
+        if os.path.exists(LOCKFILE):
+            click.echo("Another worker already started the subprocess.")
+        else:
+            node_process = subprocess.Popen(['node', node_process_path,f"debug={os.environ.get('DEBUG','False')}",f'cwd={os.getcwd()}',f"sock_path={socket_path}"])
+            with open(LOCKFILE, "w") as f:
+                f.write(str(node_process.pid))
+
         if mode == "dev":
             settings["DEBUG"] = True
             click.echo("Building app in in watch mode")
@@ -472,11 +485,11 @@ def runserver(mode):
             try:
                 # Start the initial subprocess and begin watching for changes
                 observer.start()
-                print("Watching for changes...")
+                click.echo("Watching for changes...")
                 while True:
                     time.sleep(1)  # Keep the program running to watch for events
             except KeyboardInterrupt:
-                print("Exiting...")
+                click.echo("Exiting...")
                 observer.stop()
             finally:
                 observer.join()
@@ -489,18 +502,8 @@ def runserver(mode):
             module = load_module(module_name,os.path.join(dir_path,"create_app.py"))
             if hasattr(module, "create_app"):
                 module.create_app()
-            # Define the socket path
-            socket_path = os.path.join(os.getcwd(),"_gingerjs", f"unix.sock")
-            # Start the Node.js server as a subprocess
-            node_process_path = os.path.join(dir_path,"../js_bridge", "unix_sock.js")
-            LOCKFILE = "/tmp/my_subprocess.lock"
-            if os.path.exists(LOCKFILE):
-                print("Another worker already started the subprocess.")
-            else:
-                node_process = subprocess.Popen(['node', node_process_path,f"debug={os.environ.get('DEBUG','False')}",f'cwd={os.getcwd()}',f"sock_path={socket_path}"])
-                with open(LOCKFILE, "w") as f:
-                    f.write(str(node_process.pid))
-            subprocess.run([f"uvicorn","_gingerjs.main:app","--port",settings.get("PORT"),"--host",settings.get("HOST"),"--workers",settings.get("UVICORN_WORKERS")], check=True, cwd=base,env=my_env)
+            
+            subprocess.run([f"uvicorn","_gingerjs.main:app","--port",settings.get("PORT"),"--host",settings.get("HOST"),"--workers",settings.get("UVICORN_WORKERS","1")], check=True, cwd=base,env=my_env)
         except  Exception as e:
             raise e
 
